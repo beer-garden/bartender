@@ -1,10 +1,10 @@
 import os
 from concurrent.futures import wait
 
-from echo_sleeper.config import DEFAULT_MESSAGE
-
 from brewtils.decorators import system, parameter
 from brewtils.rest.system_client import SystemClient
+
+DEFAULT_MESSAGE = "Happy World!"
 
 
 @system

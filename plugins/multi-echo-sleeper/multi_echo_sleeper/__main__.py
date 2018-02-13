@@ -1,14 +1,16 @@
+from __future__ import absolute_import
+
 import os
 
-from bg_utils.local_plugin import LocalPlugin
+from brewtils.plugin import PluginBase
 from brewtils.rest.system_client import SystemClient
-from echo_sleeper.client import EchoSleeperClient
+from .client import EchoSleeperClient
 
 
 def main():
     ssl_enabled = os.getenv('BG_SSL_ENABLED', '').lower() != "false"
 
-    plugin = LocalPlugin(
+    plugin = PluginBase(
         EchoSleeperClient(
             SystemClient(os.getenv("BG_WEB_HOST"), os.getenv("BG_WEB_PORT"),
                          'echo', ssl_enabled=ssl_enabled),
