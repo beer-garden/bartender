@@ -120,8 +120,9 @@ class BartenderHandler(object):
         else:
             system = self._get_system(instance)
 
-            # This causes the request consumer to terminate itself, which ends the plugin
-            self.clients['pika'].stop(system=system.name, version=system.version,
+            # This makes the consumer terminate itself, which ends the plugin
+            self.clients['pika'].stop(system=system.name,
+                                      version=system.version,
                                       instance=instance.name)
 
         return self.parser.serialize_instance(instance, to_string=True)
@@ -140,10 +141,12 @@ class BartenderHandler(object):
         try:
             system = System.objects.get(id=system_id)
 
-            self.logger.info("Reloading system: %s-%s", system.name, system.version)
+            self.logger.info("Reloading system: %s-%s",
+                             system.name, system.version)
             self.plugin_manager.reload_system(system.name, system.version)
         except mongoengine.DoesNotExist:
-            raise bg_utils.bg_thrift.InvalidSystem('', "Couldn't find system %s" % system_id)
+            raise bg_utils.bg_thrift.InvalidSystem('', "Couldn't find system %s"
+                                                   % system_id)
 
     def removeSystem(self, system_id):
         """Removes a system from the registry if necessary.
@@ -154,45 +157,59 @@ class BartenderHandler(object):
         try:
             system = System.objects.get(id=system_id)
         except mongoengine.DoesNotExist:
-            raise bg_utils.bg_thrift.InvalidSystem('', "Couldn't find system %s" % system_id)
+            raise bg_utils.bg_thrift.InvalidSystem('', "Couldn't find system %s"
+                                                   % system_id)
 
         # Attempt to stop the plugins
-        registered = self.registry.get_plugins_by_system(system.name, system.version)
+        registered = self.registry.get_plugins_by_system(system.name,
+                                                         system.version)
 
-        # Local plugins get stopped by us
-        if registered:
-            for plugin in registered:
-                self.plugin_manager.stop_plugin(plugin)
-                self.registry.remove(plugin.unique_name)
+        try:
+            # Local plugins get stopped by us
+            if registered:
+                for plugin in registered:
+                    self.plugin_manager.stop_plugin(plugin)
+                    self.registry.remove(plugin.unique_name)
 
-        # Remote plugins get a stop request
-        else:
-            self.clients['pika'].stop(system=system.name, version=system.version)
-            count = 0
-            while (
-                    any(instance.status != 'STOPPED' for instance in system.instances) and
-                    count < bartender.config.plugin.local.timeout.shutdown):
-                sleep(1)
-                count += 1
-                system.reload()
+            # Remote plugins get a stop request
+            else:
+                self.clients['pika'].stop(system=system.name,
+                                          version=system.version)
+                count = 0
+                while (
+                        any(instance.status != 'STOPPED' for instance in system.instances) and
+                        count < bartender.config.plugin.local.timeout.shutdown):
+                    sleep(1)
+                    count += 1
+                    system.reload()
+        except Exception as ex:
+            self.logger.exception('Error while stopping plugin during removal, '
+                                  'continuing with the removal: %s', ex)
 
         system.reload()
 
-        # Now clean up the message queues
+        # Now clean up the message queues. It's possible for queues to be None
+        # if the instance wasn't property started.
         for instance in system.instances:
+            try:
+                force = (instance.status != 'STOPPED')
 
-            # It is possible for the request or admin queue to be none if we are
-            # stopping an instance that was not properly started.
-            request_queue = instance.queue_info.get('request', {}).get('name')
-            admin_queue = instance.queue_info.get('admin', {}).get('name')
-
-            self.clients['pyrabbit'].destroy_queue(request_queue,
-                                                   force_disconnect=(instance.status != 'STOPPED'))
-            self.clients['pyrabbit'].destroy_queue(admin_queue,
-                                                   force_disconnect=(instance.status != 'STOPPED'))
+                for q in (instance.queue_info.get('request', {}).get('name'),
+                          instance.queue_info.get('admin', {}).get('name')):
+                    self.clients['pyrabbit'].destroy_queue(
+                        q, force_disconnect=force)
+            except Exception as ex:
+                self.logger.exception('Error clearing queues during plugin '
+                                      'removal, continuing with the '
+                                      'removal: %s', ex)
 
         # Finally, actually delete the system
-        system.deep_delete()
+        try:
+            system.deep_delete()
+        except Exception as ex:
+            self.logger.exception('Error deep-deleting system, attempting '
+                                  'normal delete: %s', ex)
+            system.delete()
 
     def rescanSystemDirectory(self):
         """Scans plugin directory and starts any new Systems"""
