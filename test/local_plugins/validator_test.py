@@ -5,6 +5,7 @@ import unittest
 from mock import patch, Mock
 
 from bartender.errors import PluginValidationError
+from bartender.local_plugins.config import CONFIG_NAME, ENTRY_POINT_KEY
 from bartender.local_plugins.validator import LocalPluginValidator
 
 
@@ -39,7 +40,7 @@ class LocalPluginValidatorTest(unittest.TestCase):
         mock_load.return_value = {}
         self.validator.validate_plugin('/path/to/plugin')
         mock_load.assert_called_with('BGPLUGINCONFIG', '/path/to/plugin/%s' %
-                                     self.validator.CONFIG_NAME)
+                                     CONFIG_NAME)
 
     @patch('bartender.local_plugins.validator.isfile', Mock(return_value=True))
     @patch('bartender.local_plugins.validator.LocalPluginValidator.validate_plugin_path', Mock())
@@ -77,7 +78,7 @@ class LocalPluginValidatorTest(unittest.TestCase):
         isfile_mock.return_value = False
         self.assertRaises(PluginValidationError, self.validator.validate_plugin_config,
                           'not_a_file')
-        isfile_mock.assert_called_with('not_a_file/%s' % self.validator.CONFIG_NAME)
+        isfile_mock.assert_called_with('not_a_file/%s' % CONFIG_NAME)
 
     def test_validate_entry_point_none_config_module(self):
         self.assertRaises(PluginValidationError, self.validator.validate_entry_point,
@@ -92,7 +93,7 @@ class LocalPluginValidatorTest(unittest.TestCase):
 
     def test_validate_entry_point_bad_entry_point(self):
         self.assertRaises(PluginValidationError, self.validator.validate_entry_point, Mock(
-            spec=[self.validator.ENTRY_POINT_KEY], PLUGIN_ENTRY='not_a_file'), '/path/to/plugin')
+            spec=[ENTRY_POINT_KEY], PLUGIN_ENTRY='not_a_file'), '/path/to/plugin')
 
     @patch('bartender.local_plugins.validator.isfile', Mock(return_value=True))
     def test_validate_entry_point_good_file(self):

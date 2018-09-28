@@ -2,11 +2,45 @@ import logging
 import sys
 from imp import load_source
 from os import listdir
-from os.path import isfile, join, abspath
+from os.path import join, abspath
 
 import bartender
+import bartender.local_plugins
+from bartender.local_plugins.config import find_config
 from bartender.local_plugins.plugin_runner import LocalPluginRunner
 from bg_utils.models import Instance, System
+
+logger = logging.getLogger(__name__)
+
+
+def scan_plugin_path(plugin_path=None):
+    """Find valid plugin directories
+
+    Note: This scan does not walk the directory tree. All plugins must be
+    direct children of the given path.
+
+    Args:
+        plugin_path: The root path to scan
+
+    Returns:
+        A list containing tuples of (directory, config_path) for plugins
+    """
+    plugin_path = plugin_path or bartender.config.plugin.local.directory
+    plugins = set()
+
+    if plugin_path is None:
+        return plugins
+
+    for name in listdir(plugin_path):
+        path = abspath(join(plugin_path, name))
+
+        config = find_config(path)
+        if config:
+            plugins.add((path, abspath(config),))
+
+    logger.debug("Found plugin directories: %s" % [p[0] for p in plugins])
+
+    return plugins
 
 
 class LocalPluginLoader(object):
@@ -24,31 +58,10 @@ class LocalPluginLoader(object):
         After each has been loaded, it checks the requirements to ensure
         the plugin can be loaded correctly.
         """
-        for plugin_path in self.scan_plugin_path():
-            self.load_plugin(plugin_path)
+        for plugin in scan_plugin_path():
+            self.load_plugin(plugin)
 
         self.validate_plugin_requirements()
-
-    def scan_plugin_path(self, path=None):
-        """Find valid plugin directories in a given path.
-
-        Note: This scan does not walk the directory tree - all plugins must be in the top
-        level of the given path.
-
-        :param path: The path to scan for plugins. If none will default to the plugin path
-            specified at initialization.
-        :return: A list containing paths specifying plugins
-        """
-        path = path or bartender.config.plugin.local.directory
-
-        if path is None:
-            return []
-        else:
-            return [
-                abspath(join(path, plugin))
-                for plugin in listdir(path)
-                if not isfile(join(path, plugin))
-            ]
 
     def validate_plugin_requirements(self):
         """Validates requirements for each plugin can be satisfied by one of the loaded plugins"""
@@ -59,29 +72,32 @@ class LocalPluginLoader(object):
         for plugin in plugin_list:
             for required_plugin in plugin.requirements:
                 if required_plugin not in plugin_names:
-                    self.logger.warning("Plugin %s requires plugin %s which is "
-                                        "not one of the known plugins.",
-                                        plugin.system.name, required_plugin)
-                    self.logger.warning("Plugin %s will not be loaded.", plugin.system.name)
+                    self.logger.warning(
+                        "Not loading plugin %s - it requires plugin %s which "
+                        "is not one of the known plugins.",
+                        plugin.system.name, required_plugin)
                     plugins_to_remove.append(plugin)
 
         for plugin in plugins_to_remove:
             self.registry.remove(plugin.unique_name)
 
-    def load_plugin(self, plugin_path):
-        """Loads a plugin given a path to a plugin directory.
+    def load_plugin(self, plugin_tuple):
+        """Loads a plugin
 
-        It will use the validator to validate the plugin before registering the plugin in the
-        database as well as adding an entry to the plugin map
+        It will use the validator to validate the plugin before registering the
+        plugin in the database as well as adding an entry to the plugin map
 
-        :param plugin_path: The path of the plugin to load
+        :param plugin_tuple: tuple with path, config file
         :return: The loaded plugin
         """
+        plugin_path = plugin_tuple[0]
+        config_path = plugin_tuple[1]
+
         if not self.validator.validate_plugin(plugin_path):
-            self.logger.warning("Not loading plugin at %s because it was invalid.", plugin_path)
+            self.logger.warning("Not loading invalid plugin at %s", plugin_path)
             return False
 
-        config = self._load_plugin_config(join(plugin_path, 'beer.conf'))
+        config = self._load_plugin_config(config_path)
 
         plugin_name = config['NAME']
         plugin_version = config['VERSION']
@@ -105,26 +121,34 @@ class LocalPluginLoader(object):
             plugin_id = plugin_system.id
             plugin_commands = plugin_system.commands
 
-        plugin_system = System(id=plugin_id, name=plugin_name, version=plugin_version,
-                               commands=plugin_commands,
-                               instances=[Instance(name=instance_name)
-                                          for instance_name in plugin_instances],
-                               max_instances=len(plugin_instances),
-                               description=config.get('DESCRIPTION'),
-                               icon_name=config.get('ICON_NAME'),
-                               display_name=config.get('DISPLAY_NAME'),
-                               metadata=config.get('METADATA'))
-        # TODO: Right now, we have to save this system because the LocalPluginRunner
-        # uses the database to determine status, specifically, it calls reload on the
-        # instance object which we need to change to satisfy
+        plugin_system = System(
+            id=plugin_id,
+            name=plugin_name,
+            version=plugin_version,
+            commands=plugin_commands,
+            instances=[Instance(name=name) for name in plugin_instances],
+            max_instances=len(plugin_instances),
+            description=config.get('DESCRIPTION'),
+            icon_name=config.get('ICON_NAME'),
+            display_name=config.get('DISPLAY_NAME'),
+            metadata=config.get('METADATA'),
+        )
+
+        # TODO: Right now, we have to save this system because the
+        # LocalPluginRunner uses the database to determine status. It calls
+        # reload on the instance object which we need to change to satisfy
         plugin_system.deep_save()
 
         plugin_list = []
         for instance_name in plugin_instances:
             plugin = LocalPluginRunner(
-                plugin_entry, plugin_system, instance_name,
-                abspath(plugin_path), bartender.config.web.host,
-                bartender.config.web.port, bartender.config.web.ssl_enabled,
+                plugin_entry,
+                plugin_system,
+                instance_name,
+                plugin_path,
+                bartender.config.web.host,
+                bartender.config.web.port,
+                bartender.config.web.ssl_enabled,
                 plugin_args=plugin_args.get(instance_name),
                 environment=config['ENVIRONMENT'],
                 requirements=config['REQUIRES'],

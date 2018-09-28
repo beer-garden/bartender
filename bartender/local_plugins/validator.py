@@ -4,18 +4,12 @@ from imp import load_source
 from os.path import isdir, isfile, join
 
 from bartender.errors import PluginValidationError
+from bartender.local_plugins.config import (
+    ARGS_KEY, CONFIG_NAME, ENTRY_POINT_KEY, INSTANCES_KEY, REQUIRED_KEYS)
 
 
 class LocalPluginValidator(object):
     """Class Used for Validating Local Plugins"""
-
-    CONFIG_NAME = 'beer.conf'
-    NAME_KEY = 'NAME'
-    VERSION_KEY = 'VERSION'
-    ENTRY_POINT_KEY = 'PLUGIN_ENTRY'
-    INSTANCES_KEY = 'INSTANCES'
-    ARGS_KEY = 'PLUGIN_ARGS'
-    REQUIRED_KEYS = [NAME_KEY, VERSION_KEY, ENTRY_POINT_KEY]
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
@@ -63,7 +57,7 @@ class LocalPluginValidator(object):
             raise PluginValidationError("Attempted to validate plugin config, "
                                         "but the plugin_path is None.")
 
-        path_to_config = join(path_to_plugin, self.CONFIG_NAME)
+        path_to_config = join(path_to_plugin, CONFIG_NAME)
 
         if not isfile(path_to_config):
             raise PluginValidationError("Could not validate config file. It does not exist.")
@@ -83,7 +77,7 @@ class LocalPluginValidator(object):
         if config_module is None:
             raise PluginValidationError("Configuration is None. This is not allowed.")
 
-        for key in self.REQUIRED_KEYS:
+        for key in REQUIRED_KEYS:
             if not hasattr(config_module, key):
                 raise PluginValidationError("Required key '%s' is not present. "
                                             "This is not allowed." % key)
@@ -92,7 +86,7 @@ class LocalPluginValidator(object):
         """Loads an already validated plugin Config.
 
         That is, it assumes path_to_config will exist and that it can load it succesfully"""
-        path_to_config = join(path_to_plugin, self.CONFIG_NAME)
+        path_to_config = join(path_to_plugin, CONFIG_NAME)
 
         return load_source('BGPLUGINCONFIG', path_to_config)
 
@@ -111,11 +105,11 @@ class LocalPluginValidator(object):
         if path_to_plugin is None:
             raise PluginValidationError("Path to Plugin is None. This is not allowed.")
 
-        if not hasattr(config_module, self.ENTRY_POINT_KEY):
+        if not hasattr(config_module, ENTRY_POINT_KEY):
             raise PluginValidationError(
-                "No %s defined in the plugin configuration." % self.ENTRY_POINT_KEY)
+                "No %s defined in the plugin configuration." % ENTRY_POINT_KEY)
 
-        entry_point = getattr(config_module, self.ENTRY_POINT_KEY)
+        entry_point = getattr(config_module, ENTRY_POINT_KEY)
 
         if isfile(join(path_to_plugin, entry_point)):
             return
@@ -127,18 +121,18 @@ class LocalPluginValidator(object):
         else:
             raise PluginValidationError(
                 "The %s must be a Python script or a runnable Python package: %s" %
-                (self.ENTRY_POINT_KEY, entry_point))
+                (ENTRY_POINT_KEY, entry_point))
 
     def validate_instances_and_args(self, config_module):
         if config_module is None:
             raise PluginValidationError("Configuration is None. This is not allowed.")
 
-        plugin_args = getattr(config_module, self.ARGS_KEY, None)
-        instances = getattr(config_module, self.INSTANCES_KEY, None)
+        plugin_args = getattr(config_module, ARGS_KEY, None)
+        instances = getattr(config_module, INSTANCES_KEY, None)
 
         if instances is not None and not isinstance(instances, list):
             raise PluginValidationError("'%s' entry was not None or a list. This is invalid. "
-                                        "Got: %s" % (self.INSTANCES_KEY, instances))
+                                        "Got: %s" % (INSTANCES_KEY, instances))
 
         if plugin_args is None:
             return True
@@ -149,7 +143,7 @@ class LocalPluginValidator(object):
                 if instances is not None and instance_name not in instances:
                     raise PluginValidationError(
                         "'%s' contains key '%s' but that instance is not specified in the '%s'"
-                        "entry." % (self.ARGS_KEY, instance_name, self.INSTANCES_KEY))
+                        "entry." % (ARGS_KEY, instance_name, INSTANCES_KEY))
                 self.validate_individual_plugin_arguments(instance_args)
 
             if instances:
@@ -157,12 +151,12 @@ class LocalPluginValidator(object):
                     if instance_name not in plugin_args.keys():
                         raise PluginValidationError(
                             "'%s' contains key '%s' but that instance is not specified in the "
-                            "'%s' entry." % (self.INSTANCES_KEY, instance_name, self.ARGS_KEY))
+                            "'%s' entry." % (INSTANCES_KEY, instance_name, ARGS_KEY))
 
             return True
         else:
             raise PluginValidationError("'%s' entry was not a list or dictionary. This is invalid. "
-                                        "Got: %s" % (self.ARGS_KEY, plugin_args))
+                                        "Got: %s" % (ARGS_KEY, plugin_args))
 
     def validate_individual_plugin_arguments(self, plugin_args):
         """Validates an individual PLUGIN_ARGS entry"""
