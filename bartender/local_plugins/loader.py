@@ -120,7 +120,6 @@ class LocalPluginLoader(object):
         plugin_system.deep_save()
 
         plugin_list = []
-        plugin_log_directory = bartender.config.plugin.local.log_directory
         for instance_name in plugin_instances:
             plugin = LocalPluginRunner(
                 plugin_entry, plugin_system, instance_name,
@@ -129,7 +128,7 @@ class LocalPluginLoader(object):
                 plugin_args=plugin_args.get(instance_name),
                 environment=config['ENVIRONMENT'],
                 requirements=config['REQUIRES'],
-                plugin_log_directory=plugin_log_directory,
+                plugin_log_directory=bartender.config.plugin.local.log_directory,
                 url_prefix=bartender.config.web.url_prefix,
                 ca_verify=bartender.config.web.ca_verify,
                 ca_cert=bartender.config.web.ca_cert,
@@ -151,8 +150,8 @@ class LocalPluginLoader(object):
 
         instances = getattr(config_module, 'INSTANCES', None)
         plugin_args = getattr(config_module, 'PLUGIN_ARGS', None)
-        user_log_level = getattr(config_module, 'LOG_LEVEL', 'INFO')
-        log_level = self._convert_log_level(user_log_level)
+        log_name = getattr(config_module, 'LOG_LEVEL', 'INFO')
+        log_level = getattr(logging, str(log_name).upper(), logging.INFO)
 
         if instances is None and plugin_args is None:
             instances = ['default']
@@ -185,22 +184,16 @@ class LocalPluginLoader(object):
             'INSTANCES': instances,
             'PLUGIN_ENTRY': config_module.PLUGIN_ENTRY,
             'PLUGIN_ARGS': plugin_args,
+            'LOG_LEVEL': log_level,
             'DESCRIPTION': getattr(config_module, 'DESCRIPTION', ''),
             'ICON_NAME': getattr(config_module, 'ICON_NAME', None),
             'DISPLAY_NAME': getattr(config_module, 'DISPLAY_NAME', None),
             'REQUIRES': getattr(config_module, 'REQUIRES', []),
             'ENVIRONMENT': getattr(config_module, 'ENVIRONMENT', {}),
             'METADATA': getattr(config_module, 'METADATA', {}),
-            'LOG_LEVEL': log_level,
         }
 
         if 'BGPLUGINCONFIG' in sys.modules:
             del sys.modules['BGPLUGINCONFIG']
 
         return config
-
-    def _convert_log_level(self, level_name):
-        try:
-            return getattr(logging, str(level_name).upper())
-        except AttributeError:
-            return logging.INFO
