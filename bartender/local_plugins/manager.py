@@ -19,10 +19,11 @@ class LocalPluginsManager(object):
     def start_plugin(self, plugin):
         """Start a specific plugin.
 
-        If a plugin cannot Be found (i.e. it was not loaded) then it will not do anything
-        If the plugin is already running, it will do nothing.
-        If a plugin instance has not started after the PLUGIN_STARTUP_TIMEOUT it will mark that
-        instance as stopped
+        If a plugin can't be found (i.e. it was not loaded) or is already
+        running then this method will do nothing
+
+        If a plugin instance has not started after the PLUGIN_STARTUP_TIMEOUT
+        it will be marked as DEAD
 
         :param plugin: The plugin to start
         :return: True if any plugin instances successfully started. False if the plugin does
@@ -38,18 +39,16 @@ class LocalPluginsManager(object):
             new_plugin = plugin
         elif plugin.status in ['DEAD', 'STOPPED']:
             new_plugin = LocalPluginRunner(
-                plugin.entry_point, plugin.system, plugin.instance_name,
-                plugin.path_to_plugin, plugin.web_host, plugin.web_port,
-                plugin.ssl_enabled,
+                plugin.entry_point,
+                plugin.system,
+                plugin.instance_name,
+                plugin.path_to_plugin,
                 plugin_args=plugin.plugin_args,
                 environment=plugin.environment,
                 requirements=plugin.requirements,
                 plugin_log_directory=plugin.plugin_log_directory,
-                url_prefix=plugin.url_prefix,
-                ca_verify=plugin.ca_verify,
-                ca_cert=plugin.ca_cert,
                 username=plugin.username,
-                password=plugin.password
+                password=plugin.password,
             )
             self.registry.remove(plugin.unique_name)
             self.registry.register_plugin(new_plugin)
@@ -85,9 +84,12 @@ class LocalPluginsManager(object):
             # Plugin must be marked as stopped before sending shutdown message
             plugin.stop()
 
-            # Send a stop request. This initiates a graceful shutdown on the plugin side.
-            self.clients['pika'].stop(system=plugin.system.name, version=plugin.system.version,
-                                      instance=plugin.instance_name)
+            # This initiates a graceful shutdown on the plugin side.
+            self.clients['pika'].stop(
+                system=plugin.system.name,
+                version=plugin.system.version,
+                instance=plugin.instance_name
+            )
 
             # Now just wait for the plugin thread to die
             self.logger.info("Waiting for plugin %s to stop...", plugin.unique_name)

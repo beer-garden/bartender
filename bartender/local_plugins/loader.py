@@ -8,7 +8,7 @@ import bartender
 import bartender.local_plugins
 from bartender.local_plugins.config import find_config
 from bartender.local_plugins.plugin_runner import LocalPluginRunner
-from bg_utils.models import Instance, System
+from brewtils.models import Instance, System
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +99,8 @@ class LocalPluginLoader(object):
 
         config = self._load_plugin_config(config_path)
 
+        plugin_id = None
+        plugin_commands = []
         plugin_name = config['NAME']
         plugin_version = config['VERSION']
         plugin_entry = config["PLUGIN_ENTRY"]
@@ -106,16 +108,12 @@ class LocalPluginLoader(object):
         plugin_args = config['PLUGIN_ARGS']
 
         # If this system already exists we need to do some stuff
-        plugin_id = None
-        plugin_commands = []
-        # TODO: replace this with a call from the EasyClient
-        # plugin_system = self.easy_client.find_unique_system(name=plugin_name,
-        #                                                     version=plugin_version)
-        plugin_system = System.find_unique(plugin_name, plugin_version)
+        plugin_system = bartender.bv_client.find_unique_system(
+            name=plugin_name, version=plugin_version)
+
         if plugin_system:
-            # Remove the current instances so they aren't left dangling
-            # TODO: This should be replaced with a network call
-            plugin_system.delete_instances()
+            # TODO Remove the current instances so they aren't left dangling
+            # plugin_system.delete_instances()
 
             # Carry these over to the new system
             plugin_id = plugin_system.id
@@ -126,7 +124,7 @@ class LocalPluginLoader(object):
             name=plugin_name,
             version=plugin_version,
             commands=plugin_commands,
-            instances=[Instance(name=name) for name in plugin_instances],
+            instances=[Instance(name=name, status='INITIALIZING') for name in plugin_instances],
             max_instances=len(plugin_instances),
             description=config.get('DESCRIPTION'),
             icon_name=config.get('ICON_NAME'),
@@ -134,10 +132,7 @@ class LocalPluginLoader(object):
             metadata=config.get('METADATA'),
         )
 
-        # TODO: Right now, we have to save this system because the
-        # LocalPluginRunner uses the database to determine status. It calls
-        # reload on the instance object which we need to change to satisfy
-        plugin_system.deep_save()
+        plugin_system = bartender.bv_client.create_system(plugin_system)
 
         plugin_list = []
         for instance_name in plugin_instances:
@@ -146,19 +141,13 @@ class LocalPluginLoader(object):
                 plugin_system,
                 instance_name,
                 plugin_path,
-                bartender.config.web.host,
-                bartender.config.web.port,
-                bartender.config.web.ssl_enabled,
                 plugin_args=plugin_args.get(instance_name),
                 environment=config['ENVIRONMENT'],
                 requirements=config['REQUIRES'],
                 plugin_log_directory=bartender.config.plugin.local.log_directory,
-                url_prefix=bartender.config.web.url_prefix,
-                ca_verify=bartender.config.web.ca_verify,
-                ca_cert=bartender.config.web.ca_cert,
                 username=bartender.config.plugin.local.auth.username,
                 password=bartender.config.plugin.local.auth.password,
-                log_level=config['LOG_LEVEL']
+                log_level=config['LOG_LEVEL'],
             )
 
             self.registry.register_plugin(plugin)
