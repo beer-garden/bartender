@@ -1,6 +1,7 @@
 import logging
 
 import bartender
+import bartender.local_plugins.loader
 from bartender.errors import PluginStartupError
 from bartender.local_plugins.plugin_runner import LocalPluginRunner
 from bg_utils.models import System
@@ -9,9 +10,8 @@ from bg_utils.models import System
 class LocalPluginsManager(object):
     """LocalPluginsManager that is capable of stopping/starting and restarting plugins"""
 
-    def __init__(self, loader, validator, registry, clients):
+    def __init__(self, validator, registry, clients):
         self.logger = logging.getLogger(__name__)
-        self.loader = loader
         self.validator = validator
         self.registry = registry
         self.clients = clients
@@ -150,7 +150,7 @@ class LocalPluginsManager(object):
         for plugin in plugins:
             self.registry.remove(plugin.unique_name)
 
-        self.loader.load_plugin(path_to_plugin)
+        bartender.local_plugins.loader.load_plugin(path_to_plugin)
 
     def start_all_plugins(self):
         """Attempts to start all plugins in the registry."""
@@ -265,14 +265,14 @@ class LocalPluginsManager(object):
 
         :return: None
         """
-        scanned_plugins_paths = set(self.loader.scan_plugin_path())
+        scanned_plugins_paths = set(bartender.local_plugins.loader.scan_plugin_path())
         existing_plugin_paths = set([plugin.path_to_plugin
                                      for plugin in self.registry.get_all_plugins()])
 
         new_plugins = []
         for plugin_path in scanned_plugins_paths.difference(existing_plugin_paths):
             try:
-                loaded_plugins = self.loader.load_plugin(plugin_path)
+                loaded_plugins = bartender.local_plugins.loader.load_plugin(plugin_path)
 
                 if not loaded_plugins:
                     raise Exception("Couldn't load plugin at %s" % plugin_path)

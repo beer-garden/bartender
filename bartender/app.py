@@ -7,8 +7,8 @@ from mongoengine import Q
 from requests.exceptions import RequestException
 
 import bartender
+import bartender.local_plugins.loader
 import bg_utils
-from bartender.local_plugins.loader import LocalPluginLoader
 from bartender.local_plugins.manager import LocalPluginsManager
 from bartender.local_plugins.monitor import LocalPluginMonitor
 from bartender.local_plugins.registry import LocalPluginRegistry
@@ -35,9 +35,6 @@ class BartenderApp(StoppableThread):
         self.plugin_registry = LocalPluginRegistry()
         self.plugin_validator = LocalPluginValidator()
 
-        self.plugin_loader = LocalPluginLoader(validator=self.plugin_validator,
-                                               registry=self.plugin_registry)
-
         self.clients = {
             'pika': PikaClient(host=bartender.config.amq.host,
                                port=bartender.config.amq.connections.message.port,
@@ -56,8 +53,10 @@ class BartenderApp(StoppableThread):
         }
 
         self.plugin_manager = LocalPluginsManager(
-            loader=self.plugin_loader, validator=self.plugin_validator,
-            registry=self.plugin_registry, clients=self.clients)
+            validator=self.plugin_validator,
+            registry=self.plugin_registry,
+            clients=self.clients
+        )
 
         self.handler = BartenderHandler(registry=self.plugin_registry, clients=self.clients,
                                         plugin_manager=self.plugin_manager,
@@ -115,7 +114,7 @@ class BartenderApp(StoppableThread):
             helper_thread.start()
 
         self.logger.info("Loading all local plugins...")
-        self.plugin_loader.load_plugins()
+        bartender.local_plugins.loader.load_plugins()
 
         self.logger.info("Starting all local plugins...")
         self.plugin_manager.start_all_plugins()

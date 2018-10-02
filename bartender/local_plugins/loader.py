@@ -43,170 +43,165 @@ def scan_plugin_path(plugin_path=None):
     return plugins
 
 
-class LocalPluginLoader(object):
-    """Class that helps with loading local plugins"""
+def load_plugins():
+    """Load all plugins
 
-    logger = logging.getLogger(__name__)
+    After each has been loaded, it checks the requirements to ensure
+    the plugin can be loaded correctly.
+    """
+    for plugin in scan_plugin_path():
+        load_plugin(plugin)
 
-    def __init__(self, validator, registry):
-        self.validator = validator
-        self.registry = registry
+    validate_plugin_requirements()
 
-    def load_plugins(self):
-        """Load all plugins
 
-        After each has been loaded, it checks the requirements to ensure
-        the plugin can be loaded correctly.
-        """
-        for plugin in scan_plugin_path():
-            self.load_plugin(plugin)
+def validate_plugin_requirements():
+    """Validates requirements for each plugin can be satisfied by one of the loaded plugins"""
+    plugin_list = bartender.application.plugin_registry.get_all_plugins()
+    plugin_names = bartender.application.plugin_registry.get_unique_plugin_names()
+    plugins_to_remove = []
 
-        self.validate_plugin_requirements()
+    for plugin in plugin_list:
+        for required_plugin in plugin.requirements:
+            if required_plugin not in plugin_names:
+                logger.warning(
+                    "Not loading plugin %s - it requires plugin %s which "
+                    "is not one of the known plugins.",
+                    plugin.system.name, required_plugin)
+                plugins_to_remove.append(plugin)
 
-    def validate_plugin_requirements(self):
-        """Validates requirements for each plugin can be satisfied by one of the loaded plugins"""
-        plugin_list = self.registry.get_all_plugins()
-        plugin_names = self.registry.get_unique_plugin_names()
-        plugins_to_remove = []
+    for plugin in plugins_to_remove:
+        bartender.application.registry.remove(plugin.unique_name)
 
-        for plugin in plugin_list:
-            for required_plugin in plugin.requirements:
-                if required_plugin not in plugin_names:
-                    self.logger.warning(
-                        "Not loading plugin %s - it requires plugin %s which "
-                        "is not one of the known plugins.",
-                        plugin.system.name, required_plugin)
-                    plugins_to_remove.append(plugin)
 
-        for plugin in plugins_to_remove:
-            self.registry.remove(plugin.unique_name)
+def load_plugin(plugin_tuple):
+    """Loads a plugin
 
-    def load_plugin(self, plugin_tuple):
-        """Loads a plugin
+    It will use the validator to validate the plugin before registering the
+    plugin in the database as well as adding an entry to the plugin map
 
-        It will use the validator to validate the plugin before registering the
-        plugin in the database as well as adding an entry to the plugin map
+    :param plugin_tuple: tuple with path, config file
+    :return: The loaded plugin
+    """
+    plugin_path = plugin_tuple[0]
+    config_path = plugin_tuple[1]
 
-        :param plugin_tuple: tuple with path, config file
-        :return: The loaded plugin
-        """
-        plugin_path = plugin_tuple[0]
-        config_path = plugin_tuple[1]
+    if not bartender.application.plugin_validator.validate_plugin(plugin_path):
+        logger.warning("Not loading invalid plugin at %s", plugin_path)
+        return False
 
-        if not self.validator.validate_plugin(plugin_path):
-            self.logger.warning("Not loading invalid plugin at %s", plugin_path)
-            return False
+    config = _load_plugin_config(config_path)
 
-        config = self._load_plugin_config(config_path)
+    plugin_id = None
+    plugin_commands = []
+    plugin_name = config['NAME']
+    plugin_version = config['VERSION']
+    plugin_entry = config["PLUGIN_ENTRY"]
+    plugin_instances = config['INSTANCES']
+    plugin_args = config['PLUGIN_ARGS']
 
-        plugin_id = None
-        plugin_commands = []
-        plugin_name = config['NAME']
-        plugin_version = config['VERSION']
-        plugin_entry = config["PLUGIN_ENTRY"]
-        plugin_instances = config['INSTANCES']
-        plugin_args = config['PLUGIN_ARGS']
+    # If this system already exists we need to do some stuff
+    plugin_system = bartender.bv_client.find_unique_system(
+        name=plugin_name, version=plugin_version)
 
-        # If this system already exists we need to do some stuff
-        plugin_system = bartender.bv_client.find_unique_system(
-            name=plugin_name, version=plugin_version)
+    if plugin_system:
+        # Remove the current instances so they aren't left dangling
+        for instance in plugin_system.instances:
+            bartender.bv_client.remove_instance(instance.id)
 
-        if plugin_system:
-            # TODO Remove the current instances so they aren't left dangling
-            # plugin_system.delete_instances()
+        # Carry these over to the new system
+        plugin_id = plugin_system.id
+        plugin_commands = plugin_system.commands
 
-            # Carry these over to the new system
-            plugin_id = plugin_system.id
-            plugin_commands = plugin_system.commands
+    plugin_system = System(
+        id=plugin_id,
+        name=plugin_name,
+        version=plugin_version,
+        commands=plugin_commands,
+        instances=[Instance(name=name, status='INITIALIZING') for name in plugin_instances],
+        max_instances=len(plugin_instances),
+        description=config.get('DESCRIPTION'),
+        icon_name=config.get('ICON_NAME'),
+        display_name=config.get('DISPLAY_NAME'),
+        metadata=config.get('METADATA'),
+    )
 
-        plugin_system = System(
-            id=plugin_id,
-            name=plugin_name,
-            version=plugin_version,
-            commands=plugin_commands,
-            instances=[Instance(name=name, status='INITIALIZING') for name in plugin_instances],
-            max_instances=len(plugin_instances),
-            description=config.get('DESCRIPTION'),
-            icon_name=config.get('ICON_NAME'),
-            display_name=config.get('DISPLAY_NAME'),
-            metadata=config.get('METADATA'),
+    plugin_system = bartender.bv_client.create_system(plugin_system)
+
+    plugin_list = []
+    for instance_name in plugin_instances:
+        plugin = LocalPluginRunner(
+            plugin_entry,
+            plugin_system,
+            instance_name,
+            plugin_path,
+            plugin_args=plugin_args.get(instance_name),
+            environment=config['ENVIRONMENT'],
+            requirements=config['REQUIRES'],
+            plugin_log_directory=bartender.config.plugin.local.log_directory,
+            username=bartender.config.plugin.local.auth.username,
+            password=bartender.config.plugin.local.auth.password,
+            log_level=config['LOG_LEVEL'],
         )
 
-        plugin_system = bartender.bv_client.create_system(plugin_system)
+        bartender.application.plugin_registry.register_plugin(plugin)
+        plugin_list.append(plugin)
 
-        plugin_list = []
-        for instance_name in plugin_instances:
-            plugin = LocalPluginRunner(
-                plugin_entry,
-                plugin_system,
-                instance_name,
-                plugin_path,
-                plugin_args=plugin_args.get(instance_name),
-                environment=config['ENVIRONMENT'],
-                requirements=config['REQUIRES'],
-                plugin_log_directory=bartender.config.plugin.local.log_directory,
-                username=bartender.config.plugin.local.auth.username,
-                password=bartender.config.plugin.local.auth.password,
-                log_level=config['LOG_LEVEL'],
-            )
+    return plugin_list
 
-            self.registry.register_plugin(plugin)
-            plugin_list.append(plugin)
 
-        return plugin_list
+def _load_plugin_config(path_to_config):
+    """Loads a validated plugin config"""
+    logger.debug("Loading configuration at %s", path_to_config)
 
-    def _load_plugin_config(self, path_to_config):
-        """Loads a validated plugin config"""
-        self.logger.debug("Loading configuration at %s", path_to_config)
+    config_module = load_source('BGPLUGINCONFIG', path_to_config)
 
-        config_module = load_source('BGPLUGINCONFIG', path_to_config)
+    instances = getattr(config_module, 'INSTANCES', None)
+    plugin_args = getattr(config_module, 'PLUGIN_ARGS', None)
+    log_name = getattr(config_module, 'LOG_LEVEL', 'INFO')
+    log_level = getattr(logging, str(log_name).upper(), logging.INFO)
 
-        instances = getattr(config_module, 'INSTANCES', None)
-        plugin_args = getattr(config_module, 'PLUGIN_ARGS', None)
-        log_name = getattr(config_module, 'LOG_LEVEL', 'INFO')
-        log_level = getattr(logging, str(log_name).upper(), logging.INFO)
+    if instances is None and plugin_args is None:
+        instances = ['default']
+        plugin_args = {'default': None}
 
-        if instances is None and plugin_args is None:
+    elif plugin_args is None:
+        plugin_args = {}
+        for instance_name in instances:
+            plugin_args[instance_name] = None
+
+    elif instances is None:
+        if isinstance(plugin_args, list):
             instances = ['default']
-            plugin_args = {'default': None}
+            plugin_args = {'default': plugin_args}
+        elif isinstance(plugin_args, dict):
+            instances = list(plugin_args.keys())
+        else:
+            raise ValueError('Unknown plugin args type: %s' % plugin_args)
 
-        elif plugin_args is None:
-            plugin_args = {}
-            for instance_name in instances:
-                plugin_args[instance_name] = None
+    elif isinstance(plugin_args, list):
+        temp_args = {}
+        for instance_name in instances:
+            temp_args[instance_name] = plugin_args
 
-        elif instances is None:
-            if isinstance(plugin_args, list):
-                instances = ['default']
-                plugin_args = {'default': plugin_args}
-            elif isinstance(plugin_args, dict):
-                instances = list(plugin_args.keys())
-            else:
-                raise ValueError('Unknown plugin args type: %s' % plugin_args)
+        plugin_args = temp_args
 
-        elif isinstance(plugin_args, list):
-            temp_args = {}
-            for instance_name in instances:
-                temp_args[instance_name] = plugin_args
+    config = {
+        'NAME': config_module.NAME,
+        'VERSION': config_module.VERSION,
+        'INSTANCES': instances,
+        'PLUGIN_ENTRY': config_module.PLUGIN_ENTRY,
+        'PLUGIN_ARGS': plugin_args,
+        'LOG_LEVEL': log_level,
+        'DESCRIPTION': getattr(config_module, 'DESCRIPTION', ''),
+        'ICON_NAME': getattr(config_module, 'ICON_NAME', None),
+        'DISPLAY_NAME': getattr(config_module, 'DISPLAY_NAME', None),
+        'REQUIRES': getattr(config_module, 'REQUIRES', []),
+        'ENVIRONMENT': getattr(config_module, 'ENVIRONMENT', {}),
+        'METADATA': getattr(config_module, 'METADATA', {}),
+    }
 
-            plugin_args = temp_args
+    if 'BGPLUGINCONFIG' in sys.modules:
+        del sys.modules['BGPLUGINCONFIG']
 
-        config = {
-            'NAME': config_module.NAME,
-            'VERSION': config_module.VERSION,
-            'INSTANCES': instances,
-            'PLUGIN_ENTRY': config_module.PLUGIN_ENTRY,
-            'PLUGIN_ARGS': plugin_args,
-            'LOG_LEVEL': log_level,
-            'DESCRIPTION': getattr(config_module, 'DESCRIPTION', ''),
-            'ICON_NAME': getattr(config_module, 'ICON_NAME', None),
-            'DISPLAY_NAME': getattr(config_module, 'DISPLAY_NAME', None),
-            'REQUIRES': getattr(config_module, 'REQUIRES', []),
-            'ENVIRONMENT': getattr(config_module, 'ENVIRONMENT', {}),
-            'METADATA': getattr(config_module, 'METADATA', {}),
-        }
-
-        if 'BGPLUGINCONFIG' in sys.modules:
-            del sys.modules['BGPLUGINCONFIG']
-
-        return config
+    return config

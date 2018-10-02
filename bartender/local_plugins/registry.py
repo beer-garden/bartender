@@ -3,6 +3,7 @@ import logging
 
 class LocalPluginRegistry(object):
     """Plugin Registry that is responsible for keeping track of plugins and their status"""
+
     def __init__(self):
         self._registry = []
         self.logger = logging.getLogger(__name__)
