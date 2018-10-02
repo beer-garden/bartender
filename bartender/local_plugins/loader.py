@@ -5,9 +5,9 @@ from os import listdir
 from os.path import join, abspath
 
 import bartender
-import bartender.local_plugins
 from bartender.local_plugins.config import find_config
 from bartender.local_plugins.plugin_runner import LocalPluginRunner
+from bartender.local_plugins.validator import validate_plugin
 from brewtils.models import Instance, System
 
 logger = logging.getLogger(__name__)
@@ -86,7 +86,7 @@ def load_plugin(plugin_tuple):
     plugin_path = plugin_tuple[0]
     config_path = plugin_tuple[1]
 
-    if not bartender.application.plugin_validator.validate_plugin(plugin_path):
+    if not validate_plugin(plugin_path):
         logger.warning("Not loading invalid plugin at %s", plugin_path)
         return False
 

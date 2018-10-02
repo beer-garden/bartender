@@ -12,7 +12,6 @@ import bg_utils
 from bartender.local_plugins.manager import LocalPluginsManager
 from bartender.local_plugins.monitor import LocalPluginMonitor
 from bartender.local_plugins.registry import LocalPluginRegistry
-from bartender.local_plugins.validator import LocalPluginValidator
 from bartender.mongo_pruner import MongoPruner
 from bartender.monitor import PluginStatusMonitor
 from bartender.pika import PikaClient
@@ -33,7 +32,6 @@ class BartenderApp(StoppableThread):
 
         self.request_validator = RequestValidator()
         self.plugin_registry = LocalPluginRegistry()
-        self.plugin_validator = LocalPluginValidator()
 
         self.clients = {
             'pika': PikaClient(host=bartender.config.amq.host,
@@ -53,7 +51,6 @@ class BartenderApp(StoppableThread):
         }
 
         self.plugin_manager = LocalPluginsManager(
-            validator=self.plugin_validator,
             registry=self.plugin_registry,
             clients=self.clients
         )
