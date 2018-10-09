@@ -5,134 +5,102 @@ from os.path import isdir, isfile, join
 
 from bartender.errors import PluginValidationError
 from bartender.local_plugins.config import (
-    ARGS_KEY, CONFIG_NAME, ENTRY_POINT_KEY, INSTANCES_KEY, REQUIRED_KEYS)
+    ARGS_KEY, ENTRY_POINT_KEY, INSTANCES_KEY, REQUIRED_KEYS)
 
 logger = logging.getLogger(__name__)
 
 
-def validate_plugin(path_to_plugin):
-    """Validates a Plugin and its arguments
+def validate_config(plugin_path, config_path):
+    """Validate a plugin config
 
-    :param path_to_plugin:
-    :return:
+    Args:
+        config_path (str): Path to plugin config file
+
+    Returns:
+        bool: True if the configuration is valid, False otherwise
     """
-    logger.debug("Validating Plugin at %s ", path_to_plugin)
+    logger.debug("Validating config at %s ", config_path)
 
     try:
-        validate_plugin_path(path_to_plugin)
-        logger.debug("Validated Plugin Path successfully.")
+        if config_path is None or isdir(config_path) or not isfile(config_path):
+            return False
 
-        validate_plugin_config(path_to_plugin)
-        logger.debug("Validated Plugin Config successfully.")
+        config_module = load_source('BGPLUGINCONFIG', config_path)
 
-        logger.debug("Successfully validated Plugin at %s", path_to_plugin)
-        return True
+        if config_module is None:
+            raise PluginValidationError("Configuration module is None")
+
+        validate_required_config_keys(config_module)
+        logger.debug("Required keys are present.")
+
+        validate_entry_point(config_module, plugin_path)
+        logger.debug("Validated Plugin Entry Point successfully.")
+
+        validate_instances_and_args(config_module)
+        logger.debug("Validated plugin instances & arguments successfully.")
+
+        validate_plugin_environment(config_module)
+        logger.debug("Validated Plugin Environment successfully.")
 
     except PluginValidationError as pve:
-        logger.error("Validation error occurred on plugin located at : %s", path_to_plugin)
+        logger.error("Error validating config at %s", config_path)
         logger.error(str(pve))
         return False
     finally:
         if 'BGPLUGINCONFIG' in sys.modules:
             del sys.modules['BGPLUGINCONFIG']
 
-
-def validate_plugin_path(path_to_plugin):
-    """Validates that a plugin path is actually a path and not a single file."""
-    if path_to_plugin is None or not isdir(path_to_plugin):
-        raise PluginValidationError('Plugin path "%s" is not a directory' % path_to_plugin)
-
-    return True
-
-
-def validate_plugin_config(path_to_plugin):
-    """Validates that there is a beer.conf file in the path_to_plugin
-
-    :param path_to_plugin: Path to the plugin
-    :return: True if beer.conf exists
-    :raises: PluginValidationError if beer.conf is not found
-    """
-    if path_to_plugin is None:
-        raise PluginValidationError("Attempted to validate plugin config, "
-                                    "but the plugin_path is None.")
-
-    path_to_config = join(path_to_plugin, CONFIG_NAME)
-
-    if not isfile(path_to_config):
-        raise PluginValidationError("Could not validate config file. It does not exist.")
-
-    config_module = _load_plugin_config(path_to_plugin)
-    validate_required_config_keys(config_module)
-    logger.debug("Required keys are present.")
-
-    validate_entry_point(config_module, path_to_plugin)
-    logger.debug("Validated Plugin Entry Point successfully.")
-
-    validate_instances_and_args(config_module)
-    logger.debug("Validated plugin instances & arguments successfully.")
-
-    validate_plugin_environment(config_module)
-    logger.debug("Validated Plugin Environment successfully.")
+    logger.debug("Successfully validated Plugin at %s", config_path)
 
     return True
 
 
 def validate_required_config_keys(config_module):
-    if config_module is None:
-        raise PluginValidationError("Configuration is None. This is not allowed.")
 
     for key in REQUIRED_KEYS:
         if not hasattr(config_module, key):
-            raise PluginValidationError("Required key '%s' is not present. "
-                                        "This is not allowed." % key)
+            raise PluginValidationError("Required key '%s' not present" % key)
 
 
-def _load_plugin_config(path_to_plugin):
-    """Loads an already validated plugin Config.
+def validate_entry_point(config_module, plugin_path):
+    """Validate a plugin's entry point
 
-    That is, it assumes path_to_config will exist and that it can load it succesfully"""
-    path_to_config = join(path_to_plugin, CONFIG_NAME)
+    An entry point is considered valid if the config has an entry with key
+    PLUGIN_ENTRY and the value is a path to either a file or the name of a
+    runnable Python module.
 
-    return load_source('BGPLUGINCONFIG', path_to_config)
+    Args:
+        config_module:
+        plugin_path:
 
+    Returns:
+        bool: True if the entry point is valid, False otherwise
 
-def validate_entry_point(config_module, path_to_plugin):
-    """Validates a plugin's entry point. Returns True or throws a PluginValidationError
+    Raises:
+        PluginValidationError: The entry point is invalid
 
-    An entry point is considered valid if the config has an entry with key PLUGIN_ENTRY
-    and the value is a path to either a file or the name of a runnable Python module.
-
-    :param config_module: The previously loaded configuration for the plugin
-    :param path_to_plugin: The path to the root of the plugin
     """
-    if config_module is None:
-        raise PluginValidationError("Configuration is None. This is not allowed.")
-
-    if path_to_plugin is None:
-        raise PluginValidationError("Path to Plugin is None. This is not allowed.")
-
     if not hasattr(config_module, ENTRY_POINT_KEY):
         raise PluginValidationError(
             "No %s defined in the plugin configuration." % ENTRY_POINT_KEY)
 
     entry_point = getattr(config_module, ENTRY_POINT_KEY)
 
-    if isfile(join(path_to_plugin, entry_point)):
-        return
+    if isfile(join(plugin_path, entry_point)):
+        return True
     elif entry_point.startswith('-m '):
-        pkg_path = join(path_to_plugin, entry_point[3:])
-        if isdir(pkg_path) and isfile(join(pkg_path, '__init__.py')) and isfile(
-                join(pkg_path, '__main__.py')):
-            return
-    else:
-        raise PluginValidationError(
-            "The %s must be a Python script or a runnable Python package: %s" %
-            (ENTRY_POINT_KEY, entry_point))
+        pkg_path = join(plugin_path, entry_point[3:])
+        if (isdir(pkg_path) and
+                isfile(join(pkg_path, '__init__.py')) and
+                isfile(join(pkg_path, '__main__.py'))):
+            return True
+
+    raise PluginValidationError(
+        "The %s must be a Python script or a runnable Python package: %s" %
+        (ENTRY_POINT_KEY, entry_point))
 
 
 def validate_instances_and_args(config_module):
-    if config_module is None:
-        raise PluginValidationError("Configuration is None. This is not allowed.")
 
     plugin_args = getattr(config_module, ARGS_KEY, None)
     instances = getattr(config_module, INSTANCES_KEY, None)
@@ -192,11 +160,8 @@ def validate_plugin_environment(config_module):
     :param config_module:
     :return: True if valid
     :raises: PluginValidationError if something goes wrong while validating
-    """
-    if config_module is None:
-        logger.error("Configuration is None. This is not allowed.")
-        raise PluginValidationError("Configuration is None. This is not allowed.")
 
+    """
     if hasattr(config_module, "ENVIRONMENT"):
         env = config_module.ENVIRONMENT
         if not isinstance(env, dict):
