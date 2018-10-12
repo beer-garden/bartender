@@ -28,8 +28,8 @@ class LocalPluginMonitor(StoppableThread):
     def monitor(self):
         """Make sure plugins stay alive.
 
-        Iterate through all plugins, testing them one at a time.
-        If any of them are dead restart them, otherwise just keep chugging along.
+        Iterate through all plugins, testing them one at a time. If any of them
+        are dead restart them, otherwise just keep chugging along.
         """
         for plugin in self.registry.get_all_plugins():
             if self.stopped():
@@ -37,16 +37,15 @@ class LocalPluginMonitor(StoppableThread):
 
             if plugin.process and plugin.process.poll() is not None and not plugin.stopped():
                 if plugin.status == 'RUNNING':
-                    self.logger.warning("It looks like plugin %s has "
-                                        "unexpectedly stopped running.", plugin.unique_name)
-                    self.logger.warning("If this is happening often, you "
-                                        "need to talk to the plugin developer.")
-                    self.logger.warning("Restarting plugin: %s", plugin.unique_name)
+                    self.logger.warning(
+                        "It looks like plugin %s has unexpectedly stopped. "
+                        "If this is happening often you should let the plugin "
+                        "developer know. Restarting.", plugin.unique_name)
 
                     plugin.status = 'DEAD'
                     self.plugin_manager.restart_plugin(plugin)
                 elif plugin.status == 'STARTING':
-                    self.logger.warning("It looks like plugin %s has "
-                                        "failed to start.", plugin.unique_name)
-                    self.logger.warning("Marking plugin %s as dead.", plugin.unique_name)
+                    self.logger.warning(
+                        "It looks like plugin %s has failed to start. Marking "
+                        "it as dead.", plugin.unique_name)
                     plugin.status = 'DEAD'

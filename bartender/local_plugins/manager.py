@@ -3,7 +3,9 @@ import logging
 import bartender
 import bartender.local_plugins.loader
 from bartender.errors import PluginStartupError
+from bartender.local_plugins.config import find_config
 from bartender.local_plugins.plugin_runner import LocalPluginRunner
+from bartender.local_plugins.validator import validate_config
 from bg_utils.models import System
 
 
@@ -129,15 +131,16 @@ class LocalPluginsManager(object):
             self.logger.error(message)
             raise Exception(message)
 
-        path_to_plugin = plugins[0].path_to_plugin
+        plugin_path = plugins[0].path_to_plugin
+        config_path = find_config(plugin_path)
 
         # Verify the new configuration is valid before we remove the
         # current plugins from the registry
-        # if not validate_plugin(path_to_plugin):
-        #     message = ("Could not reload system %s-%s: new configuration is not valid" %
-        #                (system_name, system_version))
-        #     self.logger.warning(message)
-        #     raise Exception(message)
+        if not validate_config(plugin_path, config_path):
+            message = ("Could not reload system %s-%s: new configuration is "
+                       "not valid" % (system_name, system_version))
+            self.logger.warning(message)
+            raise Exception(message)
 
         for plugin in plugins:
             if plugin.status == 'RUNNING':
@@ -149,7 +152,7 @@ class LocalPluginsManager(object):
         for plugin in plugins:
             self.registry.remove(plugin.unique_name)
 
-        bartender.local_plugins.loader.load_plugin(path_to_plugin)
+        bartender.local_plugins.loader.load_plugin((plugin_path, config_path))
 
     def start_all_plugins(self):
         """Attempts to start all plugins in the registry."""
