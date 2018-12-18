@@ -50,7 +50,12 @@ def load_plugins():
     the plugin can be loaded correctly.
     """
     for plugin in scan_plugin_path():
-        load_plugin(plugin)
+        try:
+            load_plugin(plugin)
+        except Exception as ex:
+            logger.exception(
+                "Exception while loading plugin at %s: %s", plugin[0], ex
+            )
 
     validate_plugin_requirements()
 

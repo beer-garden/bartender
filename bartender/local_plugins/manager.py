@@ -6,7 +6,7 @@ from bartender.errors import PluginStartupError
 from bartender.local_plugins.config import find_config
 from bartender.local_plugins.plugin_runner import LocalPluginRunner
 from bartender.local_plugins.validator import validate_config
-from bg_utils.models import System
+from bg_utils.mongo.models import System
 
 
 class LocalPluginsManager(object):
@@ -54,7 +54,7 @@ class LocalPluginsManager(object):
             self.registry.remove(plugin.unique_name)
             self.registry.register_plugin(new_plugin)
         else:
-            raise PluginStartupError('Plugin in an invalid state')
+            raise PluginStartupError('Plugin in an invalid state (%s)' % plugin.status)
 
         new_plugin.status = 'STARTING'
         new_plugin.start()
