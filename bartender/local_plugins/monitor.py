@@ -11,11 +11,13 @@ class LocalPluginMonitor(StoppableThread):
 
     def __init__(self, plugin_manager, registry):
         self.logger = logging.getLogger(__name__)
-        self.display_name = 'Local Plugin Monitor'
+        self.display_name = "Local Plugin Monitor"
         self.plugin_manager = plugin_manager
         self.registry = registry
 
-        super(LocalPluginMonitor, self).__init__(logger=self.logger, name="LocalPluginMonitor")
+        super(LocalPluginMonitor, self).__init__(
+            logger=self.logger, name="LocalPluginMonitor"
+        )
 
     def run(self):
         self.logger.info(self.display_name + " is started")
@@ -42,7 +44,7 @@ class LocalPluginMonitor(StoppableThread):
                         "If this is happening often you should let the plugin "
                         "developer know. Restarting.", plugin.unique_name)
 
-                    plugin.status = 'DEAD'
+                    plugin.status = "DEAD"
                     self.plugin_manager.restart_plugin(plugin)
                 elif plugin.status == 'STARTING':
                     self.logger.warning(

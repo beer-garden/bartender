@@ -58,9 +58,9 @@ class LocalPluginRunner(StoppableThread):
 
         self.process = None
         self.executable = [sys.executable]
-        if self.entry_point.startswith('-m '):
-            self.executable.append('-m')
-            self.executable.append(self.entry_point.split(' ', 1)[1])
+        if self.entry_point.startswith("-m "):
+            self.executable.append("-m")
+            self.executable.append(self.entry_point.split(" ", 1)[1])
         else:
             self.executable.append(self.entry_point)
         self.executable += self.plugin_args
@@ -74,7 +74,7 @@ class LocalPluginRunner(StoppableThread):
         # Logger used for bartender purposes.
         self.logger = getPluginLogger(
             self.unique_name,
-            format_string='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            format_string="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             **log_config
         )
 

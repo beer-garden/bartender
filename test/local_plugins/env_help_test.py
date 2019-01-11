@@ -8,14 +8,14 @@ from test import mangle_env
 
 @pytest.mark.parametrize('data,expected', [
     ('$FOO', True),  # Normal
-    ('\$foo:$BAR', True),  # Embedded
+    (r'\$foo:$BAR', True),  # Embedded
     ('foo:$BAR', True),  # Embedded 2
     ('', False),  # Empty string
     ('foo', False),  # No dollar
-    ('\$foo', False),  # Single escaped
-    ('\$foo:\$bar', False),  # Multi escaped
+    (r'\$foo', False),  # Single escaped
+    (r'\$foo:\$bar', False),  # Multi escaped
     ('$.MyWeirdValue', False),  # Bad variable
-    ('foo\$bar', False),  # Embedded escape
+    (r'foo\$bar', False),  # Embedded escape
 ])
 def test_string_contains_environment_var(data, expected):
     assert string_contains_environment_var(data) is expected
@@ -41,7 +41,7 @@ def test_get_environment_var_name_from_string(data, expected):
 
 @pytest.mark.parametrize('data,expected,env_updates', [
     ('foo', 'foo', {}),
-    ('FOO_BAR:/path/el\$e', 'FOO_BAR:/path/el\$e', {}),
+    (r'FOO_BAR:/path/el\$e', r'FOO_BAR:/path/el\$e', {}),
     ('$FOO', 'BAR', {'FOO': 'BAR'}),
     ('$FOO:$BAR', '/path1:/path2', {'FOO': '/path1', 'BAR': '/path2'}),
     ('/home/bin:$FOO', '/home/bin:/path1', {'FOO': '/path1'}),
