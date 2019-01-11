@@ -10,9 +10,9 @@ ARGS_KEY = "PLUGIN_ARGS"
 REQUIRED_KEYS = [NAME_KEY, VERSION_KEY, ENTRY_POINT_KEY]
 
 
-def find_config(root):
+def find_config(root, config_file=CONFIG_NAME):
     for dir_path, dir_names, file_names in os.walk(root):
-        if CONFIG_NAME in file_names:
+        if config_file in file_names:
             return join(dir_path, CONFIG_NAME)
 
     return None
