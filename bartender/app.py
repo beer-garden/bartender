@@ -58,13 +58,15 @@ class BartenderApp(StoppableThread):
         }
 
         self.plugin_manager = LocalPluginsManager(
-            registry=self.plugin_registry,
-            clients=self.clients
+            registry=self.plugin_registry, clients=self.clients
         )
 
-        self.handler = BartenderHandler(registry=self.plugin_registry, clients=self.clients,
-                                        plugin_manager=self.plugin_manager,
-                                        request_validator=self.request_validator)
+        self.handler = BartenderHandler(
+            registry=self.plugin_registry,
+            clients=self.clients,
+            plugin_manager=self.plugin_manager,
+            request_validator=self.request_validator,
+        )
 
         self.helper_threads = [
             HelperThread(

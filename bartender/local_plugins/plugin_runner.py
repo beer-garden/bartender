@@ -13,7 +13,7 @@ from brewtils.rest.easy_client import EasyClient
 from brewtils.stoppable_thread import StoppableThread
 
 # This is recommended, see https://github.com/google/python-subprocess32
-if os.name == 'posix' and sys.version_info[0] < 3:
+if os.name == "posix" and sys.version_info[0] < 3:
     import subprocess32 as subprocess
 else:
     import subprocess
@@ -25,16 +25,16 @@ class LocalPluginRunner(StoppableThread):
     Can be stopped/started and killed like a normal process"""
 
     def __init__(
-            self,
-            entry_point,
-            system,
-            instance_name,
-            path_to_plugin,
-            plugin_args=None,
-            environment=None,
-            requirements=None,
-            plugin_log_directory=None,
-            **kwargs
+        self,
+        entry_point,
+        system,
+        instance_name,
+        path_to_plugin,
+        plugin_args=None,
+        environment=None,
+        requirements=None,
+        plugin_log_directory=None,
+        **kwargs
     ):
         self.entry_point = entry_point
         self.system = system
@@ -44,17 +44,20 @@ class LocalPluginRunner(StoppableThread):
         self.environment = environment or {}
         self.requirements = requirements or []
         self.plugin_log_directory = plugin_log_directory
-        self.username = kwargs.get('username', None)
-        self.password = kwargs.get('password', None)
-        self.plugin_default_log_level = kwargs.get('log_level', logging.INFO)
+        self.username = kwargs.get("username", None)
+        self.password = kwargs.get("password", None)
+        self.plugin_default_log_level = kwargs.get("log_level", logging.INFO)
 
         for instance in self.system.instances:
             if instance.name == self.instance_name:
                 self.instance = instance
                 break
 
-        self.unique_name = '%s[%s]-%s' % (
-            self.system.name, self.instance_name, self.system.version)
+        self.unique_name = "%s[%s]-%s" % (
+            self.system.name,
+            self.instance_name,
+            self.system.version,
+        )
 
         self.process = None
         self.executable = [sys.executable]
@@ -67,8 +70,8 @@ class LocalPluginRunner(StoppableThread):
 
         self.log_levels = getLogLevels()
         log_config = {
-            'log_directory': self.plugin_log_directory,
-            'log_name': self.unique_name
+            "log_directory": self.plugin_log_directory,
+            "log_name": self.unique_name,
         }
 
         # Logger used for bartender purposes.
@@ -78,19 +81,17 @@ class LocalPluginRunner(StoppableThread):
             **log_config
         )
 
-        log_config['log_level'] = self.plugin_default_log_level
+        log_config["log_level"] = self.plugin_default_log_level
         self.unformatted_logger = getPluginLogger(
-            self.unique_name+'-uf',
-            **log_config
+            self.unique_name + "-uf", **log_config
         )
         self.timestamp_logger = getPluginLogger(
-            self.unique_name+'-ts',
-            format_string='%(asctime)s - %(message)s',
+            self.unique_name + "-ts",
+            format_string="%(asctime)s - %(message)s",
             **log_config
         )
 
-        self.ez_client = EasyClient(
-            logger=self.logger, **bartender.config.web)
+        self.ez_client = EasyClient(logger=self.logger, **bartender.config.web)
 
         StoppableThread.__init__(self, logger=self.logger, name=self.unique_name)
 
@@ -99,17 +100,17 @@ class LocalPluginRunner(StoppableThread):
         try:
             return self.ez_client.get_instance_status(self.instance.id).status
         except Exception:
-            self.logger.error("Error getting status of plugin %s" %
-                              self.unique_name)
-            return 'UNKNOWN'
+            self.logger.error("Error getting status of plugin %s" % self.unique_name)
+            return "UNKNOWN"
 
     @status.setter
     def status(self, value):
         try:
             self.ez_client.update_instance_status(self.instance.id, value)
         except Exception:
-            self.logger.error("Error updating status of plugin %s to %s" %
-                              (self.unique_name, value))
+            self.logger.error(
+                "Error updating status of plugin %s to %s" % (self.unique_name, value)
+            )
 
     def kill(self):
         """Kills the plugin by killing the underlying process."""
@@ -125,8 +126,9 @@ class LocalPluginRunner(StoppableThread):
         subprocess. Pipes STDOUT and STDERR such that when the plugin stops executing
         (or IO is flushed) it will log it.
         """
-        self.logger.info("Starting plugin %s subprocess: %s" %
-                         (self.unique_name, self.executable))
+        self.logger.info(
+            "Starting plugin %s subprocess: %s" % (self.unique_name, self.executable)
+        )
 
         try:
             self.process = subprocess.Popen(
@@ -144,13 +146,13 @@ class LocalPluginRunner(StoppableThread):
             # gracefully, so reading IO needs to be its own thread
             stdout_thread = Thread(
                 target=self._check_io,
-                name=self.unique_name+'_stdout_thread',
-                args=(self.process.stdout, logging.INFO)
+                name=self.unique_name + "_stdout_thread",
+                args=(self.process.stdout, logging.INFO),
             )
             stderr_thread = Thread(
                 target=self._check_io,
-                name=self.unique_name+'_stderr_thread',
-                args=(self.process.stderr, logging.ERROR)
+                name=self.unique_name + "_stderr_thread",
+                args=(self.process.stderr, logging.ERROR),
             )
 
             stdout_thread.start()
@@ -162,7 +164,9 @@ class LocalPluginRunner(StoppableThread):
 
             self.logger.info(
                 "Plugin %s process stopped with exit status %s, performing "
-                "final IO reads", self.unique_name, self.process.poll()
+                "final IO reads",
+                self.unique_name,
+                self.process.poll(),
             )
 
             stdout_thread.join()
@@ -214,20 +218,19 @@ class LocalPluginRunner(StoppableThread):
     def _generate_plugin_environment(self):
 
         plugin_env = {
-            'BG_WEB_HOST': bartender.config.web.host,
-            'BG_WEB_PORT': bartender.config.web.port,
-            'BG_SSL_ENABLED': bartender.config.web.ssl_enabled,
-            'BG_URL_PREFIX': bartender.config.web.url_prefix,
-            'BG_CA_VERIFY': bartender.config.web.ca_verify,
-            'BG_CA_CERT': bartender.config.web.ca_cert,
-
-            'BG_NAME': self.system.name,
-            'BG_VERSION': self.system.version,
-            'BG_INSTANCE_NAME': self.instance_name,
-            'BG_PLUGIN_PATH': self.path_to_plugin,
-            'BG_USERNAME': self.username,
-            'BG_PASSWORD': self.password,
-            'BG_LOG_LEVEL': logging.getLevelName(self.plugin_default_log_level),
+            "BG_WEB_HOST": bartender.config.web.host,
+            "BG_WEB_PORT": bartender.config.web.port,
+            "BG_SSL_ENABLED": bartender.config.web.ssl_enabled,
+            "BG_URL_PREFIX": bartender.config.web.url_prefix,
+            "BG_CA_VERIFY": bartender.config.web.ca_verify,
+            "BG_CA_CERT": bartender.config.web.ca_cert,
+            "BG_NAME": self.system.name,
+            "BG_VERSION": self.system.version,
+            "BG_INSTANCE_NAME": self.instance_name,
+            "BG_PLUGIN_PATH": self.path_to_plugin,
+            "BG_USERNAME": self.username,
+            "BG_PASSWORD": self.password,
+            "BG_LOG_LEVEL": logging.getLevelName(self.plugin_default_log_level),
         }
 
         for key, value in plugin_env.items():

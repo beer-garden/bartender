@@ -40,18 +40,24 @@ class PluginLoaderTest(unittest.TestCase):
 
         self.loader = LocalPluginLoader(self.mock_validator, self.mock_registry)
 
-    @patch('bartender.local_plugins.loader.scan_plugin_path',
-           Mock(return_value={('p1_path', 'p1_config',)}))
-    @patch('bartender.local_plugins.loader.LocalPluginLoader.validate_plugin_requirements')
-    @patch('bartender.local_plugins.loader.LocalPluginLoader.load_plugin')
+    @patch(
+        "bartender.local_plugins.loader.scan_plugin_path",
+        Mock(return_value={("p1_path", "p1_config")}),
+    )
+    @patch(
+        "bartender.local_plugins.loader.LocalPluginLoader.validate_plugin_requirements"
+    )
+    @patch("bartender.local_plugins.loader.LocalPluginLoader.load_plugin")
     def test_load_plugins(self, load_plugin_mock, validate_mock):
         self.loader.load_plugins()
-        load_plugin_mock.assert_called_once_with(('p1_path', 'p1_config',))
+        load_plugin_mock.assert_called_once_with(("p1_path", "p1_config"))
         validate_mock.assert_called_once_with()
 
-    @patch('bartender.local_plugins.loader.scan_plugin_path', Mock(return_value=[]))
-    @patch('bartender.local_plugins.loader.LocalPluginLoader.validate_plugin_requirements')
-    @patch('bartender.local_plugins.loader.LocalPluginLoader.load_plugin')
+    @patch("bartender.local_plugins.loader.scan_plugin_path", Mock(return_value=[]))
+    @patch(
+        "bartender.local_plugins.loader.LocalPluginLoader.validate_plugin_requirements"
+    )
+    @patch("bartender.local_plugins.loader.LocalPluginLoader.load_plugin")
     def test_load_plugins_empty(self, load_plugin_mock, validate_mock):
         self.loader.load_plugins()
         self.assertFalse(load_plugin_mock.called)
@@ -71,16 +77,26 @@ class PluginLoaderTest(unittest.TestCase):
         load_plugin_mock.assert_has_calls([call("pl1"), call("pl2")], any_order=False)
         validate_mock.assert_called_once_with()
 
-    @patch('bartender.local_plugins.loader.listdir', Mock(return_value=['dir1', 'dir2']))
-    @patch('bartender.local_plugins.loader.find_config', Mock(side_effect=['conf1', 'conf2']))
-    @patch('bartender.local_plugins.loader.listdir', Mock(return_value=['file1', 'file2']))
-    @patch('bartender.local_plugins.loader.isfile', Mock(side_effect=[False, True]))
-    @patch('bartender.local_plugins.loader.LocalPluginLoader.load_plugin', Mock())
+    @patch(
+        "bartender.local_plugins.loader.listdir", Mock(return_value=["dir1", "dir2"])
+    )
+    @patch(
+        "bartender.local_plugins.loader.find_config",
+        Mock(side_effect=["conf1", "conf2"]),
+    )
+    @patch(
+        "bartender.local_plugins.loader.listdir", Mock(return_value=["file1", "file2"])
+    )
+    @patch("bartender.local_plugins.loader.isfile", Mock(side_effect=[False, True]))
+    @patch("bartender.local_plugins.loader.LocalPluginLoader.load_plugin", Mock())
     def test_scan_plugin_path(self):
         self.assertEqual(
             scan_plugin_path(),
-            {(join(self.plugin_path, 'dir1'), abspath('conf1')),
-             (join(self.plugin_path, 'dir2'), abspath('conf2'))})
+            {
+                (join(self.plugin_path, "dir1"), abspath("conf1")),
+                (join(self.plugin_path, "dir2"), abspath("conf2")),
+            },
+        )
 
     @patch("bartender.local_plugins.loader.listdir", Mock(return_value=[]))
     def test_scan_plugin_path_empty(self):

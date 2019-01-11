@@ -5,7 +5,11 @@ from os.path import isdir, isfile, join
 
 from bartender.errors import PluginValidationError
 from bartender.local_plugins.config import (
-    ARGS_KEY, ENTRY_POINT_KEY, INSTANCES_KEY, REQUIRED_KEYS)
+    ARGS_KEY,
+    ENTRY_POINT_KEY,
+    INSTANCES_KEY,
+    REQUIRED_KEYS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +29,7 @@ def validate_config(plugin_path, config_path):
         if config_path is None or isdir(config_path) or not isfile(config_path):
             return False
 
-        config_module = load_source('BGPLUGINCONFIG', config_path)
+        config_module = load_source("BGPLUGINCONFIG", config_path)
 
         if config_module is None:
             raise PluginValidationError("Configuration module is None")
@@ -47,8 +51,8 @@ def validate_config(plugin_path, config_path):
         logger.error(str(pve))
         return False
     finally:
-        if 'BGPLUGINCONFIG' in sys.modules:
-            del sys.modules['BGPLUGINCONFIG']
+        if "BGPLUGINCONFIG" in sys.modules:
+            del sys.modules["BGPLUGINCONFIG"]
 
     logger.debug("Successfully validated Plugin at %s", config_path)
 
@@ -82,22 +86,26 @@ def validate_entry_point(config_module, plugin_path):
     """
     if not hasattr(config_module, ENTRY_POINT_KEY):
         raise PluginValidationError(
-            "No %s defined in the plugin configuration." % ENTRY_POINT_KEY)
+            "No %s defined in the plugin configuration." % ENTRY_POINT_KEY
+        )
 
     entry_point = getattr(config_module, ENTRY_POINT_KEY)
 
     if isfile(join(plugin_path, entry_point)):
         return True
-    elif entry_point.startswith('-m '):
+    elif entry_point.startswith("-m "):
         pkg_path = join(plugin_path, entry_point[3:])
-        if (isdir(pkg_path) and
-                isfile(join(pkg_path, '__init__.py')) and
-                isfile(join(pkg_path, '__main__.py'))):
+        if (
+            isdir(pkg_path)
+            and isfile(join(pkg_path, "__init__.py"))
+            and isfile(join(pkg_path, "__main__.py"))
+        ):
             return True
 
     raise PluginValidationError(
-        "The %s must be a Python script or a runnable Python package: %s" %
-        (ENTRY_POINT_KEY, entry_point))
+        "The %s must be a Python script or a runnable Python package: %s"
+        % (ENTRY_POINT_KEY, entry_point)
+    )
 
 
 def validate_instances_and_args(config_module):
@@ -106,8 +114,10 @@ def validate_instances_and_args(config_module):
     instances = getattr(config_module, INSTANCES_KEY, None)
 
     if instances is not None and not isinstance(instances, list):
-        raise PluginValidationError("'%s' entry was not None or a list. This is invalid. "
-                                    "Got: %s" % (INSTANCES_KEY, instances))
+        raise PluginValidationError(
+            "'%s' entry was not None or a list. This is invalid. "
+            "Got: %s" % (INSTANCES_KEY, instances)
+        )
 
     if plugin_args is None:
         return True
@@ -118,7 +128,8 @@ def validate_instances_and_args(config_module):
             if instances is not None and instance_name not in instances:
                 raise PluginValidationError(
                     "'%s' contains key '%s' but that instance is not specified in the '%s'"
-                    "entry." % (ARGS_KEY, instance_name, INSTANCES_KEY))
+                    "entry." % (ARGS_KEY, instance_name, INSTANCES_KEY)
+                )
             validate_individual_plugin_arguments(instance_args)
 
         if instances:
@@ -126,12 +137,15 @@ def validate_instances_and_args(config_module):
                 if instance_name not in plugin_args.keys():
                     raise PluginValidationError(
                         "'%s' contains key '%s' but that instance is not specified in the "
-                        "'%s' entry." % (INSTANCES_KEY, instance_name, ARGS_KEY))
+                        "'%s' entry." % (INSTANCES_KEY, instance_name, ARGS_KEY)
+                    )
 
         return True
     else:
-        raise PluginValidationError("'%s' entry was not a list or dictionary. This is invalid. "
-                                    "Got: %s" % (ARGS_KEY, plugin_args))
+        raise PluginValidationError(
+            "'%s' entry was not a list or dictionary. This is invalid. "
+            "Got: %s" % (ARGS_KEY, plugin_args)
+        )
 
 
 def validate_individual_plugin_arguments(plugin_args):
@@ -140,14 +154,16 @@ def validate_individual_plugin_arguments(plugin_args):
     if plugin_args is not None and not isinstance(plugin_args, list):
         raise PluginValidationError(
             "Invalid Plugin Argument Specified: %s. It was not a list or None. "
-            "This is not allowed." % plugin_args)
+            "This is not allowed." % plugin_args
+        )
 
     if isinstance(plugin_args, list):
         for plugin_arg in plugin_args:
             if not isinstance(plugin_arg, str):
                 raise PluginValidationError(
                     "Invalid plugin argument: %s - this argument must be a "
-                    "string." % plugin_arg)
+                    "string." % plugin_arg
+                )
 
     return True
 
@@ -167,24 +183,28 @@ def validate_plugin_environment(config_module):
         if not isinstance(env, dict):
             raise PluginValidationError(
                 "Invalid ENVIRONMENT type specified: %s. This argument must be "
-                "a dictionary." % env)
+                "a dictionary." % env
+            )
 
         for key, value in env.items():
             if not isinstance(key, str):
                 raise PluginValidationError(
                     "Invalid Key: %s specified for plugin environment. This "
-                    "must be a String." % key)
+                    "must be a String." % key
+                )
 
             if key.startswith("BG_"):
                 raise PluginValidationError(
                     "Invalid key: %s specified for plugin environment. The "
                     "'BG_' prefix is a special case for beer-garden only "
                     "environment variables. You will have to pick another "
-                    "name. Sorry for the inconvenience." % key)
+                    "name. Sorry for the inconvenience." % key
+                )
 
             if not isinstance(value, str):
                 raise PluginValidationError(
                     "Invalid Value: %s specified for plugin environment. "
-                    "This must be a String." % value)
+                    "This must be a String." % value
+                )
 
     return True

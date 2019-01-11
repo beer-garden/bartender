@@ -89,10 +89,10 @@ class LocalPluginsManager(object):
             plugin.stop()
 
             # This initiates a graceful shutdown on the plugin side.
-            self.clients['pika'].stop(
+            self.clients["pika"].stop(
                 system=plugin.system.name,
                 version=plugin.system.version,
-                instance=plugin.instance_name
+                instance=plugin.instance_name,
             )
 
             # Now just wait for the plugin thread to die
@@ -148,8 +148,10 @@ class LocalPluginsManager(object):
         # Verify the new configuration is valid before we remove the
         # current plugins from the registry
         if not validate_config(plugin_path, config_path):
-            message = ("Could not reload system %s-%s: new configuration is "
-                       "not valid" % (system_name, system_version))
+            message = (
+                "Could not reload system %s-%s: new configuration is "
+                "not valid" % (system_name, system_version)
+            )
             self.logger.warning(message)
             raise Exception(message)
 
@@ -289,8 +291,9 @@ class LocalPluginsManager(object):
         :return: None
         """
         scanned_plugins_paths = set(bartender.local_plugins.loader.scan_plugin_path())
-        existing_plugin_paths = set([plugin.path_to_plugin
-                                     for plugin in self.registry.get_all_plugins()])
+        existing_plugin_paths = set(
+            [plugin.path_to_plugin for plugin in self.registry.get_all_plugins()]
+        )
 
         new_plugins = []
         for plugin_path in scanned_plugins_paths.difference(existing_plugin_paths):

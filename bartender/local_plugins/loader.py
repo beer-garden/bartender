@@ -36,7 +36,7 @@ def scan_plugin_path(plugin_path=None):
 
         config = find_config(path)
         if config:
-            plugins.add((path, abspath(config),))
+            plugins.add((path, abspath(config)))
 
     logger.debug("Found plugin directories: %s" % [p[0] for p in plugins])
 
@@ -53,9 +53,7 @@ def load_plugins():
         try:
             load_plugin(plugin)
         except Exception as ex:
-            logger.exception(
-                "Exception while loading plugin at %s: %s", plugin[0], ex
-            )
+            logger.exception("Exception while loading plugin at %s: %s", plugin[0], ex)
 
     validate_plugin_requirements()
 
@@ -72,7 +70,9 @@ def validate_plugin_requirements():
                 logger.warning(
                     "Not loading plugin %s - it requires plugin %s which "
                     "is not one of the known plugins.",
-                    plugin.system.name, required_plugin)
+                    plugin.system.name,
+                    required_plugin,
+                )
                 plugins_to_remove.append(plugin)
 
     for plugin in plugins_to_remove:
@@ -99,15 +99,16 @@ def load_plugin(plugin_tuple):
 
     plugin_id = None
     plugin_commands = []
-    plugin_name = config['NAME']
-    plugin_version = config['VERSION']
+    plugin_name = config["NAME"]
+    plugin_version = config["VERSION"]
     plugin_entry = config["PLUGIN_ENTRY"]
-    plugin_instances = config['INSTANCES']
-    plugin_args = config['PLUGIN_ARGS']
+    plugin_instances = config["INSTANCES"]
+    plugin_args = config["PLUGIN_ARGS"]
 
     # If this system already exists we need to do some stuff
     plugin_system = bartender.bv_client.find_unique_system(
-        name=plugin_name, version=plugin_version)
+        name=plugin_name, version=plugin_version
+    )
 
     if plugin_system:
         # Remove the current instances so they aren't left dangling
@@ -123,12 +124,14 @@ def load_plugin(plugin_tuple):
         name=plugin_name,
         version=plugin_version,
         commands=plugin_commands,
-        instances=[Instance(name=name, status='INITIALIZING') for name in plugin_instances],
+        instances=[
+            Instance(name=name, status="INITIALIZING") for name in plugin_instances
+        ],
         max_instances=len(plugin_instances),
-        description=config.get('DESCRIPTION'),
-        icon_name=config.get('ICON_NAME'),
-        display_name=config.get('DISPLAY_NAME'),
-        metadata=config.get('METADATA'),
+        description=config.get("DESCRIPTION"),
+        icon_name=config.get("ICON_NAME"),
+        display_name=config.get("DISPLAY_NAME"),
+        metadata=config.get("METADATA"),
     )
 
     plugin_system = bartender.bv_client.create_system(plugin_system)
@@ -141,12 +144,12 @@ def load_plugin(plugin_tuple):
             instance_name,
             plugin_path,
             plugin_args=plugin_args.get(instance_name),
-            environment=config['ENVIRONMENT'],
-            requirements=config['REQUIRES'],
+            environment=config["ENVIRONMENT"],
+            requirements=config["REQUIRES"],
             plugin_log_directory=bartender.config.plugin.local.log_directory,
             username=bartender.config.plugin.local.auth.username,
             password=bartender.config.plugin.local.auth.password,
-            log_level=config['LOG_LEVEL'],
+            log_level=config["LOG_LEVEL"],
         )
 
         bartender.application.plugin_registry.register_plugin(plugin)
@@ -159,16 +162,16 @@ def _load_plugin_config(path_to_config):
     """Loads a validated plugin config"""
     logger.debug("Loading configuration at %s", path_to_config)
 
-    config_module = load_source('BGPLUGINCONFIG', path_to_config)
+    config_module = load_source("BGPLUGINCONFIG", path_to_config)
 
-    instances = getattr(config_module, 'INSTANCES', None)
-    plugin_args = getattr(config_module, 'PLUGIN_ARGS', None)
-    log_name = getattr(config_module, 'LOG_LEVEL', 'INFO')
+    instances = getattr(config_module, "INSTANCES", None)
+    plugin_args = getattr(config_module, "PLUGIN_ARGS", None)
+    log_name = getattr(config_module, "LOG_LEVEL", "INFO")
     log_level = getattr(logging, str(log_name).upper(), logging.INFO)
 
     if instances is None and plugin_args is None:
-        instances = ['default']
-        plugin_args = {'default': None}
+        instances = ["default"]
+        plugin_args = {"default": None}
 
     elif plugin_args is None:
         plugin_args = {}
@@ -177,12 +180,12 @@ def _load_plugin_config(path_to_config):
 
     elif instances is None:
         if isinstance(plugin_args, list):
-            instances = ['default']
-            plugin_args = {'default': plugin_args}
+            instances = ["default"]
+            plugin_args = {"default": plugin_args}
         elif isinstance(plugin_args, dict):
             instances = list(plugin_args.keys())
         else:
-            raise ValueError('Unknown plugin args type: %s' % plugin_args)
+            raise ValueError("Unknown plugin args type: %s" % plugin_args)
 
     elif isinstance(plugin_args, list):
         temp_args = {}
@@ -192,21 +195,21 @@ def _load_plugin_config(path_to_config):
         plugin_args = temp_args
 
     config = {
-        'NAME': config_module.NAME,
-        'VERSION': config_module.VERSION,
-        'INSTANCES': instances,
-        'PLUGIN_ENTRY': config_module.PLUGIN_ENTRY,
-        'PLUGIN_ARGS': plugin_args,
-        'LOG_LEVEL': log_level,
-        'DESCRIPTION': getattr(config_module, 'DESCRIPTION', ''),
-        'ICON_NAME': getattr(config_module, 'ICON_NAME', None),
-        'DISPLAY_NAME': getattr(config_module, 'DISPLAY_NAME', None),
-        'REQUIRES': getattr(config_module, 'REQUIRES', []),
-        'ENVIRONMENT': getattr(config_module, 'ENVIRONMENT', {}),
-        'METADATA': getattr(config_module, 'METADATA', {}),
+        "NAME": config_module.NAME,
+        "VERSION": config_module.VERSION,
+        "INSTANCES": instances,
+        "PLUGIN_ENTRY": config_module.PLUGIN_ENTRY,
+        "PLUGIN_ARGS": plugin_args,
+        "LOG_LEVEL": log_level,
+        "DESCRIPTION": getattr(config_module, "DESCRIPTION", ""),
+        "ICON_NAME": getattr(config_module, "ICON_NAME", None),
+        "DISPLAY_NAME": getattr(config_module, "DISPLAY_NAME", None),
+        "REQUIRES": getattr(config_module, "REQUIRES", []),
+        "ENVIRONMENT": getattr(config_module, "ENVIRONMENT", {}),
+        "METADATA": getattr(config_module, "METADATA", {}),
     }
 
-    if 'BGPLUGINCONFIG' in sys.modules:
-        del sys.modules['BGPLUGINCONFIG']
+    if "BGPLUGINCONFIG" in sys.modules:
+        del sys.modules["BGPLUGINCONFIG"]
 
     return config

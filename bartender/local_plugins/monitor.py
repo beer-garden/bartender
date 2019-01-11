@@ -37,17 +37,25 @@ class LocalPluginMonitor(StoppableThread):
             if self.stopped():
                 break
 
-            if plugin.process and plugin.process.poll() is not None and not plugin.stopped():
-                if plugin.status == 'RUNNING':
+            if (
+                plugin.process
+                and plugin.process.poll() is not None
+                and not plugin.stopped()
+            ):
+                if plugin.status == "RUNNING":
                     self.logger.warning(
                         "It looks like plugin %s has unexpectedly stopped. "
                         "If this is happening often you should let the plugin "
-                        "developer know. Restarting.", plugin.unique_name)
+                        "developer know. Restarting.",
+                        plugin.unique_name,
+                    )
 
                     plugin.status = "DEAD"
                     self.plugin_manager.restart_plugin(plugin)
-                elif plugin.status == 'STARTING':
+                elif plugin.status == "STARTING":
                     self.logger.warning(
                         "It looks like plugin %s has failed to start. Marking "
-                        "it as dead.", plugin.unique_name)
-                    plugin.status = 'DEAD'
+                        "it as dead.",
+                        plugin.unique_name,
+                    )
+                    plugin.status = "DEAD"
