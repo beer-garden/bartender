@@ -1,5 +1,6 @@
 import unittest
 
+import json
 import mongoengine
 from mock import MagicMock, Mock, PropertyMock, patch, call
 from pyrabbit2.http import HTTPError
@@ -46,8 +47,9 @@ class BartenderHandlerTest(unittest.TestCase):
     @patch("bg_utils.mongo.models.Request.find_or_none")
     def test_process_request(self, find_mock):
         request = Mock()
+        command = Mock(parameter_keys_by_type=Mock(return_value=[]))
         find_mock.return_value = request
-        self.request_validator.validate_request.return_value = request
+        self.request_validator.validate_request.return_value = request, command
 
         self.handler.processRequest("id")
         find_mock.assert_called_once_with("id")
@@ -56,10 +58,31 @@ class BartenderHandlerTest(unittest.TestCase):
         )
 
     @patch("bg_utils.mongo.models.Request.find_or_none")
+    def test_process_bytes_request(self, find_mock):
+        request = Mock()
+        command = Mock(parameter_keys_by_type=Mock(return_value=["bytes_param"]))
+        find_mock.return_value = request
+        self.request_validator.validate_request.return_value = request, command
+
+        self.handler.processRequest("id")
+        find_mock.assert_called_once_with("id")
+        expected_kwargs = {
+            "confirm": True,
+            "mandatory": True,
+            "headers": {
+                "resolve_parameters": json.dumps(["bytes_param"]).encode("utf-8")
+            },
+        }
+        self.clients["pika"].publish_request.assert_called_once_with(
+            request, **expected_kwargs
+        )
+
+    @patch("bg_utils.mongo.models.Request.find_or_none")
     def test_process_request_fail(self, find_mock):
         request = Mock()
+        command = Mock(parameter_keys_by_type=Mock(return_value=[]))
         find_mock.return_value = request
-        self.request_validator.validate_request.return_value = request
+        self.request_validator.validate_request.return_value = request, command
         self.clients["pika"].publish_request.return_value = False
 
         self.assertRaises(

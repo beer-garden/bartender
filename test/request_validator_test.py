@@ -1,6 +1,7 @@
 import pytest
 from box import Box
 from mock import Mock, call, patch
+from mongoengine import DoesNotExist
 
 from bartender.request_validator import RequestValidator
 from bg_utils.mongo.models import Command, Parameter, Request, System, Choices
@@ -83,7 +84,8 @@ class TestSessionConfig(object):
 class TestValidateRequest(object):
     def test_success(self, validator, system_find, bg_system, bg_request):
         system_find.return_value = bg_system
-        assert validator.validate_request(bg_request) == bg_request
+        request, command = validator.validate_request(bg_request)
+        assert request == bg_request
 
 
 class TestGetAndValidateSystem(object):
@@ -449,6 +451,16 @@ class TestValidateParameterType(object):
             ("foo", "UH OH THIS IS BAD"),
             (["not an int"], "Integer"),
             ([1], "Integer"),
+            ("SHOULD_BE_DICT", "Bytes"),
+            ({}, "Bytes"),
+            (
+                {
+                    "storage_type": "INVALID_TYPE",
+                    "id": "also technically invalid",
+                    "filename": "some_filename",
+                },
+                "Bytes",
+            ),
         ],
     )
     def test_fail(self, validator, req_value, param_type):
@@ -468,6 +480,36 @@ class TestValidateParameterType(object):
             make_request(parameters={"key1": {"foo": "bar"}}), Mock(parameters=[param])
         )
         assert validated_parameters["key1"]["foo"] == "bar"
+
+    @patch("bg_utils.mongo.models.RequestFile.objects")
+    def test_bytes_invalid_id(self, objects_mock, validator):
+        objects_mock.get.side_effect = DoesNotExist
+        param = make_param(key="key1", type="Bytes")
+        request = make_request(
+            parameters={
+                "key1": {
+                    "storage_type": "gridfs",
+                    "id": "does_not_exist",
+                    "filename": "some_filename",
+                }
+            }
+        )
+        with pytest.raises(ModelValidationError):
+            validator.get_and_validate_parameters(request, Mock(parameters=[param]))
+
+    @patch("bg_utils.mongo.models.RequestFile.objects", Mock())
+    def test_bytes_success(self, validator):
+        param = make_param(key="key1", type="Bytes")
+        expected_value = {
+            "storage_type": "gridfs",
+            "id": "pretend_this_exists",
+            "filename": "some_filename",
+        }
+        request = make_request(parameters={"key1": expected_value})
+        validated_parameters = validator.get_and_validate_parameters(
+            request, Mock(parameters=[param])
+        )
+        assert validated_parameters["key1"] == expected_value
 
 
 class TestValidateChoices(object):
@@ -749,7 +791,7 @@ class TestValidateChoices(object):
             '["a", "b", "value"]',
             '["a", {"text": "text", "value": "value"}]',
             '["a", {"text": "b", "value": "2"}, "value"]',
-        ]
+        ],
     )
     def test_validate_url_choices(self, validator, response):
         session_mock = Mock()
