@@ -4,7 +4,14 @@ from mock import Mock, call, patch
 from mongoengine import DoesNotExist
 
 from bartender.request_validator import RequestValidator
-from bg_utils.mongo.models import Command, Parameter, Request, System, Choices
+from bg_utils.mongo.models import (
+    Command,
+    Parameter,
+    Request,
+    System,
+    Choices,
+    RequestFile,
+)
 from brewtils.errors import ModelValidationError
 
 
@@ -505,11 +512,14 @@ class TestValidateParameterType(object):
             "id": "pretend_this_exists",
             "filename": "some_filename",
         }
+        fake_rf = RequestFile.objects.get()
         request = make_request(parameters={"key1": expected_value})
         validated_parameters = validator.get_and_validate_parameters(
             request, Mock(parameters=[param])
         )
         assert validated_parameters["key1"] == expected_value
+        assert fake_rf.request == request
+        assert fake_rf.save.call_count == 1
 
 
 class TestValidateChoices(object):

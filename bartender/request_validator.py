@@ -465,7 +465,7 @@ class RequestValidator(object):
             elif p_type in ["date", "datetime"]:
                 return int(value)
             elif p_type == "bytes":
-                return self._get_bytes_value(value)
+                return self._get_bytes_value(value, request)
             else:
                 raise ModelValidationError(
                     "Unknown type for parameter. Please contact a system administrator."
@@ -483,7 +483,7 @@ class RequestValidator(object):
                 % (parameter.key, parameter.type)
             )
 
-    def _get_bytes_value(self, value):
+    def _get_bytes_value(self, value, request):
         required_keys = ["storage_type", "id", "filename"]
         if not isinstance(value, dict):
             raise ModelValidationError(
@@ -501,7 +501,9 @@ class RequestValidator(object):
             )
 
         try:
-            RequestFile.objects.get(id=value["id"])
+            rf = RequestFile.objects.get(id=value["id"])
+            rf.request = request
+            rf.save()
         except DoesNotExist:
             raise ModelValidationError(
                 "Bytes parameter had an id, but that id did not exist in the database."

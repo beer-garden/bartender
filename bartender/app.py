@@ -15,14 +15,14 @@ from bartender.local_plugins.manager import LocalPluginsManager
 from bartender.local_plugins.monitor import LocalPluginMonitor
 from bartender.local_plugins.registry import LocalPluginRegistry
 from bartender.local_plugins.validator import LocalPluginValidator
-from bartender.mongo_pruner import MongoPruner
+from bartender.mongo_pruner import MongoPruner, PruneTask, GridFSPrune
 from bartender.monitor import PluginStatusMonitor
 from bartender.pika import PikaClient
 from bartender.pyrabbit import PyrabbitClient
 from bartender.request_validator import RequestValidator
 from bartender.thrift.handler import BartenderHandler
 from bartender.thrift.server import make_server
-from bg_utils.mongo.models import Event, Request
+from bg_utils.mongo.models import Event, Request, RequestFile
 from brewtils.models import Events
 from brewtils.stoppable_thread import StoppableThread
 
@@ -100,14 +100,10 @@ class BartenderApp(StoppableThread):
             ),
         ]
 
-        # Only want to run the MongoPruner if it would do anything
         tasks, run_every = self._setup_pruning_tasks()
-        if run_every:
-            self.helper_threads.append(
-                HelperThread(
-                    MongoPruner, tasks=tasks, run_every=timedelta(minutes=run_every)
-                )
-            )
+        self.helper_threads.append(
+            HelperThread(MongoPruner, tasks=tasks, run_every=timedelta(seconds=10))
+        )
 
         super(BartenderApp, self).__init__(logger=self.logger, name="BartenderApp")
 
@@ -173,48 +169,60 @@ class BartenderApp(StoppableThread):
 
     @staticmethod
     def _setup_pruning_tasks():
+        info_ttl = bartender.config.db.ttl.info
+        action_ttl = bartender.config.db.ttl.action
+        event_ttl = bartender.config.db.ttl.event
 
-        prune_tasks = []
-        if bartender.config.db.ttl.info > 0:
-            prune_tasks.append(
-                {
-                    "collection": Request,
-                    "field": "created_at",
-                    "delete_after": timedelta(minutes=bartender.config.db.ttl.info),
-                    "additional_query": (
-                        Q(status="SUCCESS") | Q(status="CANCELED") | Q(status="ERROR")
-                    )
-                    & Q(has_parent=False)
-                    & Q(command_type="INFO"),
-                }
-            )
+        # Delete request files that were created, but no request ever
+        # referenced them.
+        request_file_prune = PruneTask(
+            RequestFile,
+            "created_at",
+            delete_after=timedelta(minutes=15),
+            additional_query=Q(request=None),
+        )
 
-        if bartender.config.db.ttl.action > 0:
-            prune_tasks.append(
-                {
-                    "collection": Request,
-                    "field": "created_at",
-                    "delete_after": timedelta(minutes=bartender.config.db.ttl.action),
-                    "additional_query": (
-                        Q(status="SUCCESS") | Q(status="CANCELED") | Q(status="ERROR")
-                    )
-                    & Q(has_parent=False)
-                    & Q(command_type="ACTION"),
-                }
-            )
+        # Delete all orphaned gridfs objects.
+        gridfs_prune = GridFSPrune()
 
-        if bartender.config.db.ttl.event > 0:
-            prune_tasks.append(
-                {
-                    "collection": Event,
-                    "field": "timestamp",
-                    "delete_after": timedelta(minutes=bartender.config.db.ttl.event),
-                }
-            )
+        # Delete INFO/ACTION requests past the TTL.
+        base_query = (
+            Q(status="SUCCESS") | Q(status="CANCELED") | Q(status="ERROR")
+        ) & Q(has_parent=False)
+        info_prune = PruneTask(
+            Request,
+            "created_at",
+            delete_after=timedelta(minutes=info_ttl),
+            additional_query=base_query & Q(command_type="INFO"),
+        )
+        action_prune = PruneTask(
+            Request,
+            "created_at",
+            delete_after=timedelta(minutes=action_ttl),
+            additional_query=base_query & Q(command_type="ACTION"),
+        )
+
+        # Delete events past their TTL.
+        event_prune = PruneTask(Event, "timestamp", timedelta(minutes=event_ttl))
+
+        prune_tasks = [request_file_prune]
+
+        if info_ttl > 0:
+            prune_tasks.append(info_prune)
+
+        if action_ttl > 0:
+            prune_tasks.append(action_prune)
+
+        if event_ttl > 0:
+            prune_tasks.append(event_prune)
+
+        # Order matters here, the orphan gridfs prune happens *AFTER* the info/action
+        # pruning, so that any affected requests get their files/chunks deleted.
+        prune_tasks.append(gridfs_prune)
 
         # Look at the various TTLs to determine how often to run the MongoPruner
         real_ttls = [x for x in bartender.config.db.ttl.values() if x > 0]
-        run_every = min(real_ttls) / 2 if real_ttls else None
+        run_every = min(real_ttls) / 2 if real_ttls else 7.5
 
         return prune_tasks, run_every
 
