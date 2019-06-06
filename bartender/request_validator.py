@@ -6,10 +6,11 @@ import re
 import six
 import urllib3
 from builtins import str
+from mongoengine import DoesNotExist
 from requests import Session
 
 import bartender
-from bg_utils.mongo.models import System, Choices
+from bg_utils.mongo.models import System, Choices, RequestFile
 from brewtils.choices import parse
 from brewtils.errors import ModelValidationError
 from brewtils.rest.system_client import SystemClient
@@ -40,7 +41,7 @@ class RequestValidator(object):
 
         request.parameters = self.get_and_validate_parameters(request, command)
 
-        return request
+        return request, command
 
     def get_and_validate_system(self, request):
         """Ensure there is a system in the DB that corresponds to this Request.
@@ -427,31 +428,33 @@ class RequestValidator(object):
         """Validates the value passed in, ensures the type matches.
         Recursive calls for dictionaries which also have nested parameters"""
 
+        p_type = parameter.type.lower()
+
         try:
             if value is None and not parameter.nullable:
                 raise ModelValidationError(
                     "There is no value for parameter '%s' "
                     "and this field is not nullable." % parameter.key
                 )
-            elif parameter.type.upper() == "STRING":
+            elif p_type == "string":
                 if isinstance(value, six.string_types):
                     return str(value)
                 else:
                     raise TypeError("Invalid value for string (%s)" % value)
-            elif parameter.type.upper() == "INTEGER":
+            elif p_type == "integer":
                 if int(value) != float(value):
                     raise TypeError("Invalid value for integer (%s)" % value)
                 return int(value)
-            elif parameter.type.upper() == "FLOAT":
+            elif p_type == "float":
                 return float(value)
-            elif parameter.type.upper() == "ANY":
+            elif p_type == "any":
                 return value
-            elif parameter.type.upper() == "BOOLEAN":
+            elif p_type == "boolean":
                 if value in [True, False]:
                     return value
                 else:
                     raise TypeError("Invalid value for boolean (%s)" % value)
-            elif parameter.type.upper() == "DICTIONARY":
+            elif p_type == "dictionary":
                 dict_value = dict(value)
                 if parameter.parameters:
                     self.logger.debug("Found Nested Parameters.")
@@ -459,10 +462,10 @@ class RequestValidator(object):
                         request, command, parameter.parameters, dict_value
                     )
                 return dict_value
-            elif parameter.type.upper() == "DATE":
+            elif p_type in ["date", "datetime"]:
                 return int(value)
-            elif parameter.type.upper() == "DATETIME":
-                return int(value)
+            elif p_type == "bytes":
+                return self._get_bytes_value(value, request)
             else:
                 raise ModelValidationError(
                     "Unknown type for parameter. Please contact a system administrator."
@@ -479,3 +482,31 @@ class RequestValidator(object):
                 "Value for key: %s is not the correct type. Should be: %s"
                 % (parameter.key, parameter.type)
             )
+
+    def _get_bytes_value(self, value, request):
+        required_keys = ["storage_type", "id", "filename"]
+        if not isinstance(value, dict):
+            raise ModelValidationError(
+                "Bytes parameters should be a dictionary with at least the following keys: %s"
+                % required_keys
+            )
+
+        for key in required_keys:
+            if key not in value:
+                raise ModelValidationError("Bytes parameter missing %s field" % key)
+
+        if value["storage_type"] not in RequestFile.STORAGE_ENGINES:
+            raise ModelValidationError(
+                "Bytes parameter had invalid storage type: %s" % value["storage_type"]
+            )
+
+        try:
+            rf = RequestFile.objects.get(id=value["id"])
+            rf.request = request
+            rf.save()
+        except DoesNotExist:
+            raise ModelValidationError(
+                "Bytes parameter had an id, but that id did not exist in the database."
+            )
+
+        return value

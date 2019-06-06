@@ -1,3 +1,4 @@
+import json
 import logging
 import random
 import string
@@ -47,12 +48,17 @@ class BartenderHandler(object):
             # Validates the request based on what is in the database.
             # This includes the validation of the request parameters,
             # systems are there, commands are there etc.
-            request = self.request_validator.validate_request(request)
+            request, command = self.request_validator.validate_request(request)
             request.save()
 
-            if not self.clients["pika"].publish_request(
-                request, confirm=True, mandatory=True
-            ):
+            publish_kwargs = {"confirm": True, "mandatory": True}
+            bytes_params = command.parameter_keys_by_type("Bytes")
+            if bytes_params:
+                publish_kwargs["headers"] = {
+                    "resolve_parameters": json.dumps(bytes_params).encode("utf-8")
+                }
+
+            if not self.clients["pika"].publish_request(request, **publish_kwargs):
                 msg = "Error while publishing request to queue (%s[%s]-%s %s)" % (
                     request.system,
                     request.system_version,
