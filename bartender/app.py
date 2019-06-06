@@ -102,7 +102,7 @@ class BartenderApp(StoppableThread):
 
         tasks, run_every = self._setup_pruning_tasks()
         self.helper_threads.append(
-            HelperThread(MongoPruner, tasks=tasks, run_every=timedelta(seconds=10))
+            HelperThread(MongoPruner, tasks=tasks, run_every=run_every)
         )
 
         super(BartenderApp, self).__init__(logger=self.logger, name="BartenderApp")
