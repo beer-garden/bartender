@@ -73,7 +73,7 @@ def namespace_router(_wrapped):
         if handle_local(target_ns):
             logger.debug(f"Handling {wrapped.__name__} locally")
 
-            return wrapped(*args[1:], **kwargs)
+            return wrapped(*args, **kwargs)
 
         if target_ns in bartender.config.namespaces.remote:
             logger.debug(f"Forwarding {wrapped.__name__} to {target_ns}")
@@ -99,17 +99,17 @@ class BartenderHandler(object):
 
     @staticmethod
     @namespace_router
-    def getRequest(request_id):
-        return parser.serialize_request(get_request(request_id))
+    def getRequest(namespace, request_id):
+        return parser.serialize_request(get_request(namespace, request_id))
 
     @staticmethod
     @namespace_router
-    def getRequests(query):
-        return json.dumps(get_requests(**json.loads(query)))
+    def getRequests(namespace, query):
+        return json.dumps(get_requests(namespace, **json.loads(query)))
 
     @staticmethod
     @namespace_router
-    def processRequest(request, wait_timeout):
+    def processRequest(namespace, request, wait_timeout):
         """Validates and publishes a Request.
 
         :param str request: The Request to process
@@ -119,7 +119,9 @@ class BartenderHandler(object):
         try:
             return parser.serialize_request(
                 process_request(
-                    parser.parse_request(request, from_string=True), wait_timeout
+                    namespace,
+                    parser.parse_request(request, from_string=True),
+                    wait_timeout,
                 )
             )
         except RequestPublishException as ex:
@@ -129,26 +131,29 @@ class BartenderHandler(object):
 
     @staticmethod
     @namespace_router
-    def updateRequest(request_id, patch):
-        request = Request.objects.get(id=request_id)
+    def updateRequest(namespace, request_id, patch):
+        request = Request.objects.get(namespace=namespace, id=request_id)
         parsed_patch = parser.parse_patch(patch, many=True, from_string=True)
 
-        return parser.serialize_request(update_request(request, parsed_patch))
+        return parser.serialize_request(
+            update_request(namespace, request, parsed_patch)
+        )
 
     @staticmethod
     @namespace_router
-    def getInstance(instance_id):
-        return parser.serialize_instance(get_instance(instance_id))
+    def getInstance(namespace, instance_id):
+        return parser.serialize_instance(get_instance(namespace, instance_id))
 
     @staticmethod
-    def initializeInstance(instance_id):
+    @namespace_router
+    def initializeInstance(namespace, instance_id):
         """Initializes an instance.
 
         :param instance_id: The ID of the instance
         :return: QueueInformation object describing message queue for this system
         """
         try:
-            instance = initialize_instance(instance_id)
+            instance = initialize_instance(namespace, instance_id)
         except mongoengine.DoesNotExist:
             raise bg_utils.bg_thrift.InvalidSystem(
                 "", f"Database error initializing instance {instance_id}"
@@ -158,21 +163,23 @@ class BartenderHandler(object):
 
     @staticmethod
     @namespace_router
-    def updateInstance(instance_id, patch):
+    def updateInstance(namespace, instance_id, patch):
         parsed_patch = parser.parse_patch(patch, many=True, from_string=True)
 
-        return parser.serialize_instance(update_instance(instance_id, parsed_patch))
+        return parser.serialize_instance(
+            update_instance(namespace, instance_id, parsed_patch)
+        )
 
     @staticmethod
     @namespace_router
-    def startInstance(instance_id):
+    def startInstance(namespace, instance_id):
         """Starts an instance.
 
         :param instance_id: The ID of the instance
         :return: None
         """
         try:
-            instance = start_instance(instance_id)
+            instance = start_instance(namespace, instance_id)
         except mongoengine.DoesNotExist:
             raise bg_utils.bg_thrift.InvalidSystem(
                 "", f"Couldn't find instance {instance_id}"
@@ -182,14 +189,14 @@ class BartenderHandler(object):
 
     @staticmethod
     @namespace_router
-    def stopInstance(instance_id):
+    def stopInstance(namespace, instance_id):
         """Stops an instance.
 
         :param instance_id: The ID of the instance
         :return: None
         """
         try:
-            instance = stop_instance(instance_id)
+            instance = stop_instance(namespace, instance_id)
         except mongoengine.DoesNotExist:
             raise bg_utils.bg_thrift.InvalidSystem(
                 "", f"Couldn't find instance {instance_id}"
@@ -199,7 +206,7 @@ class BartenderHandler(object):
 
     @staticmethod
     @namespace_router
-    def updateInstanceStatus(instance_id, new_status):
+    def updateInstanceStatus(namespace, instance_id, new_status):
         """Update instance status.
 
         Args:
@@ -210,7 +217,7 @@ class BartenderHandler(object):
 
         """
         try:
-            instance = update_instance_status(instance_id, new_status)
+            instance = update_instance_status(namespace, instance_id, new_status)
         except mongoengine.DoesNotExist:
             raise bg_utils.bg_thrift.InvalidSystem(
                 instance_id, f"Couldn't find instance {instance_id}"
@@ -220,14 +227,14 @@ class BartenderHandler(object):
 
     @staticmethod
     @namespace_router
-    def removeInstance(instance_id):
+    def removeInstance(namespace, instance_id):
         """Removes an instance.
 
         :param instance_id: The ID of the instance
         :return: None
         """
         try:
-            remove_instance(instance_id)
+            remove_instance(namespace, instance_id)
         except mongoengine.DoesNotExist:
             raise bg_utils.bg_thrift.InvalidSystem(
                 instance_id, f"Couldn't find instance {instance_id}"
@@ -235,14 +242,17 @@ class BartenderHandler(object):
 
     @staticmethod
     @namespace_router
-    def getSystem(system_id, include_commands):
+    def getSystem(namespace, system_id, include_commands):
         serialize_params = {} if include_commands else {"exclude": {"commands"}}
 
-        return parser.serialize_system(get_system(system_id), **serialize_params)
+        return parser.serialize_system(
+            get_system(namespace, system_id), **serialize_params
+        )
 
     @staticmethod
     @namespace_router
     def querySystems(
+        namespace,
         filter_params=None,
         order_by=None,
         include_fields=None,
@@ -264,15 +274,15 @@ class BartenderHandler(object):
             serialize_params["exclude"] = exclude_fields
 
         return parser.serialize_system(
-            query_systems(**query_params), **serialize_params
+            query_systems(namespace, **query_params), **serialize_params
         )
 
     @staticmethod
     @namespace_router
-    def createSystem(system):
+    def createSystem(namespace, system):
         try:
             return parser.serialize_system(
-                create_system(parser.parse_system(system, from_string=True))
+                create_system(namespace, parser.parse_system(system, from_string=True))
             )
         except mongoengine.errors.NotUniqueError:
             raise bg_utils.bg_thrift.ConflictException(
@@ -281,23 +291,25 @@ class BartenderHandler(object):
 
     @staticmethod
     @namespace_router
-    def updateSystem(system_id, operations):
+    def updateSystem(namespace, system_id, operations):
         return parser.serialize_system(
             update_system(
-                system_id, parser.parse_patch(operations, many=True, from_string=True)
+                namespace,
+                system_id,
+                parser.parse_patch(operations, many=True, from_string=True),
             )
         )
 
     @staticmethod
     @namespace_router
-    def reloadSystem(system_id):
+    def reloadSystem(namespace, system_id):
         """Reload a system configuration
 
         :param system_id: The system id
         :return None
         """
         try:
-            reload_system(system_id)
+            reload_system(namespace, system_id)
         except mongoengine.DoesNotExist:
             raise bg_utils.bg_thrift.InvalidSystem(
                 "", f"Couldn't find system {system_id}"
@@ -305,14 +317,14 @@ class BartenderHandler(object):
 
     @staticmethod
     @namespace_router
-    def removeSystem(system_id):
+    def removeSystem(namespace, system_id):
         """Removes a system from the registry if necessary.
 
         :param system_id: The system id
         :return:
         """
         try:
-            remove_system(system_id)
+            remove_system(namespace, system_id)
         except mongoengine.DoesNotExist:
             raise bg_utils.bg_thrift.InvalidSystem(
                 system_id, f"Couldn't find system {system_id}"
@@ -320,29 +332,31 @@ class BartenderHandler(object):
 
     @staticmethod
     @namespace_router
-    def rescanSystemDirectory():
+    def rescanSystemDirectory(namespace):
         """Scans plugin directory and starts any new Systems"""
-        rescan_system_directory()
+        rescan_system_directory(namespace)
 
     @staticmethod
     @namespace_router
-    def getQueueMessageCount(queue_name):
+    def getQueueMessageCount(namespace, queue_name):
         """Gets the size of a queue
 
         :param queue_name: The queue name
         :return: number of messages currently on the queue
         :raises Exception: If queue does not exist
         """
-        return get_queue_message_count(queue_name)
+        return get_queue_message_count(namespace, queue_name)
 
     @staticmethod
     @namespace_router
-    def getAllQueueInfo():
-        return parser.serialize_queue(get_all_queue_info(), to_string=True, many=True)
+    def getAllQueueInfo(namespace):
+        return parser.serialize_queue(
+            get_all_queue_info(namespace), to_string=True, many=True
+        )
 
     @staticmethod
     @namespace_router
-    def clearQueue(queue_name):
+    def clearQueue(namespace, queue_name):
         """Clear all Requests in the given queue
 
         Will iterate through all requests on a queue and mark them as "CANCELED".
@@ -351,67 +365,70 @@ class BartenderHandler(object):
         :raises InvalidSystem: If the system_name/instance_name does not match a queue
         """
         try:
-            clear_queue(queue_name)
+            clear_queue(namespace, queue_name)
         except NotFoundError as ex:
             raise bg_utils.bg_thrift.InvalidSystem(queue_name, str(ex))
 
     @staticmethod
     @namespace_router
-    def clearAllQueues():
+    def clearAllQueues(namespace):
         """Clears all queues that Bartender knows about"""
-        clear_all_queues()
+        clear_all_queues(namespace)
 
     @staticmethod
     @namespace_router
-    def getJob(job_id):
-        return parser.serialize_job(get_job(job_id))
+    def getJob(namespace, job_id):
+        return parser.serialize_job(get_job(namespace, job_id))
 
     @staticmethod
     @namespace_router
-    def getJobs(filter_params):
-        return parser.serialize_job(get_jobs(filter_params), many=True)
+    def getJobs(namespace, filter_params):
+        return parser.serialize_job(get_jobs(namespace, filter_params), many=True)
 
     @staticmethod
     @namespace_router
-    def createJob(job):
-        return parser.serialize_job(create_job(parser.parse_job(job, from_string=True)))
+    def createJob(namespace, job):
+        return parser.serialize_job(
+            create_job(namespace, parser.parse_job(job, from_string=True))
+        )
+
+    @staticmethod
+    def pauseJob(namespace, job_id):
+        return parser.serialize_job(pause_job(namespace, job_id))
 
     @staticmethod
     @namespace_router
-    def pauseJob(job_id):
-        return parser.serialize_job(pause_job(job_id))
+    def resumeJob(namespace, job_id):
+        return parser.serialize_job(resume_job(namespace, job_id))
 
     @staticmethod
     @namespace_router
-    def resumeJob(job_id):
-        return parser.serialize_job(resume_job(job_id))
+    def removeJob(namespace, job_id):
+        remove_job(namespace, job_id)
 
     @staticmethod
     @namespace_router
-    def removeJob(job_id):
-        remove_job(job_id)
+    def getCommand(namespace, command_id):
+        return parser.serialize_command(get_command(namespace, command_id))
 
     @staticmethod
     @namespace_router
-    def getCommand(command_id):
-        return parser.serialize_command(get_command(command_id))
+    def getCommands(namespace):
+        return parser.serialize_command(get_commands(namespace), many=True)
 
     @staticmethod
     @namespace_router
-    def getCommands():
-        return parser.serialize_command(get_commands(), many=True)
+    def getPluginLogConfig(namespace, system_name):
+        return parser.serialize_logging_config(
+            get_plugin_log_config(namespace, system_name)
+        )
 
     @staticmethod
     @namespace_router
-    def getPluginLogConfig(system_name):
-        return parser.serialize_logging_config(get_plugin_log_config(system_name))
-
-    @staticmethod
-    @namespace_router
-    def reloadPluginLogConfig():
+    def reloadPluginLogConfig(namespace):
         load_plugin_log_config()
 
-        return parser.serialize_logging_config(get_plugin_log_config())
+        return parser.serialize_logging_config(get_plugin_log_config(namespace))
 
     @staticmethod
     @namespace_router

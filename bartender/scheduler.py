@@ -196,18 +196,21 @@ class BGJobStore(BaseJobStore):
         return jobs
 
 
-def get_job(job_id):
-    return BGJob.objects.get(id=job_id)
+def get_job(namespace, job_id):
+    return BGJob.objects.get(namespace=namespace, id=job_id)
 
 
-def get_jobs(filter_params=None):
+def get_jobs(namespace, filter_params=None):
     filter_params = filter_params or {}
+    filter_params["namespace"] = namespace
+
     return BGJob.objects.filter(**filter_params)
 
 
-def create_job(job):
+def create_job(namespace, job):
     # We have to save here, because we need an ID to pass
     # to the scheduler.
+    job.namespace = namespace
     job.save()
 
     try:
@@ -228,25 +231,25 @@ def create_job(job):
         raise
 
 
-def pause_job(job_id):
+def pause_job(namespace, job_id):
     bartender.application.scheduler.pause_job(job_id, jobstore="beer_garden")
 
-    job = BGJob.objects.get(id=job_id)
+    job = BGJob.objects.get(namespace=namespace, id=job_id)
     job.status = "PAUSED"
     job.save()
 
     return job
 
 
-def resume_job(job_id):
+def resume_job(namespace, job_id):
     bartender.application.scheduler.resume_job(job_id, jobstore="beer_garden")
 
-    job = BGJob.objects.get(id=job_id)
+    job = BGJob.objects.get(namespace=namespace, id=job_id)
     job.status = "RUNNING"
     job.save()
 
     return job
 
 
-def remove_job(job_id):
+def remove_job(namespace, job_id):
     bartender.application.scheduler.remove_job(job_id, jobstore="beer_garden")

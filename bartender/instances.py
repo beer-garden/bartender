@@ -15,19 +15,19 @@ from brewtils.models import Events
 logger = logging.getLogger(__name__)
 
 
-def get_instance(instance_id):
-    return Instance.objects.get(id=instance_id)
+def get_instance(namespace, instance_id):
+    return Instance.objects.get(namespace=namespace, id=instance_id)
 
 
 @publish_event(Events.INSTANCE_INITIALIZED)
-def initialize_instance(instance_id):
+def initialize_instance(namespace, instance_id):
     """Initializes an instance.
 
     :param instance_id: The ID of the instance
     :return: QueueInformation object describing message queue for this system
     """
-    instance = Instance.objects.get(id=instance_id)
-    system = System.objects.get(instances__contains=instance)
+    instance = Instance.objects.get(namespace=namespace, id=instance_id)
+    system = System.objects.get(namespace=namespace, instances__contains=instance)
 
     logger.info(
         "Initializing instance %s[%s]-%s", system.name, instance.name, system.version
@@ -60,6 +60,7 @@ def initialize_instance(instance_id):
         "ssl": {"enabled": bartender.config.amq.connections.message.ssl.enabled},
     }
 
+    instance.namespace = namespace
     instance.status = "INITIALIZING"
     instance.status_info = StatusInfo(heartbeat=datetime.utcnow())
     instance.queue_type = "rabbitmq"
@@ -79,27 +80,27 @@ def initialize_instance(instance_id):
     return instance
 
 
-def update_instance(instance_id, patch):
+def update_instance(namespace, instance_id, patch):
     instance = None
 
     for op in patch:
         operation = op.operation.lower()
 
         if operation == "initialize":
-            instance = initialize_instance(instance_id)
+            instance = initialize_instance(namespace, instance_id)
 
         elif operation == "start":
-            instance = start_instance(instance_id)
+            instance = start_instance(namespace, instance_id)
 
         elif operation == "stop":
-            instance = stop_instance(instance_id)
+            instance = stop_instance(namespace, instance_id)
 
         elif operation == "heartbeat":
-            instance = update_instance_status(instance_id, "RUNNING")
+            instance = update_instance_status(namespace, instance_id, "RUNNING")
 
         elif operation == "replace":
             if op.path.lower() == "/status":
-                instance = update_instance_status(instance_id, op.value)
+                instance = update_instance_status(namespace, instance_id, op.value)
             else:
                 raise ModelValidationError(f"Unsupported path '{op.path}'")
         else:
@@ -109,14 +110,14 @@ def update_instance(instance_id, patch):
 
 
 @publish_event(Events.INSTANCE_STARTED)
-def start_instance(instance_id):
+def start_instance(namespace, instance_id):
     """Starts an instance.
 
     :param instance_id: The Instance id
     :return: None
     """
-    instance = Instance.objects.get(id=instance_id)
-    system = System.objects.get(instances__contains=instance)
+    instance = Instance.objects.get(namespace=namespace, id=instance_id)
+    system = System.objects.get(namespace=namespace, instances__contains=instance)
 
     logger.info(
         "Starting instance %s[%s]-%s", system.name, instance.name, system.version
@@ -130,14 +131,14 @@ def start_instance(instance_id):
 
 
 @publish_event(Events.INSTANCE_STOPPED)
-def stop_instance(instance_id):
+def stop_instance(namespace, instance_id):
     """Stops an instance.
 
     :param instance_id: The Instance id
     :return: None
     """
-    instance = Instance.objects.get(id=instance_id)
-    system = System.objects.get(instances__contains=instance)
+    instance = Instance.objects.get(namespace=namespace, id=instance_id)
+    system = System.objects.get(namespace=namespace, instances__contains=instance)
 
     logger.info(
         "Stopping instance %s[%s]-%s", system.name, instance.name, system.version
@@ -150,7 +151,7 @@ def stop_instance(instance_id):
     if local_plugin:
         bartender.application.plugin_manager.stop_plugin(local_plugin)
     else:
-        system = System.objects.get(instances__contains=instance)
+        system = System.objects.get(namespace=namespace, instances__contains=instance)
 
         # This causes the request consumer to terminate itself, which ends the plugin
         bartender.application.clients["pika"].stop(
@@ -160,7 +161,7 @@ def stop_instance(instance_id):
     return instance
 
 
-def update_instance_status(instance_id, new_status):
+def update_instance_status(namespace, instance_id, new_status):
     """Update an instance status.
 
     Will also update the status_info heartbeat.
@@ -172,7 +173,7 @@ def update_instance_status(instance_id, new_status):
     Returns:
         The updated instance
     """
-    instance = Instance.objects.get(id=instance_id)
+    instance = Instance.objects.get(namespace=namespace, id=instance_id)
     instance.status = new_status
     instance.status_info.heartbeat = datetime.utcnow()
     instance.save()
@@ -180,7 +181,7 @@ def update_instance_status(instance_id, new_status):
     return instance
 
 
-def remove_instance(instance_id):
+def remove_instance(namespace, instance_id):
     """Removes an instance
 
     Args:
@@ -189,4 +190,4 @@ def remove_instance(instance_id):
     Returns:
         None
     """
-    Instance.objects.get(id=instance_id).delete()
+    Instance.objects.get(namespace=namespace, id=instance_id).delete()

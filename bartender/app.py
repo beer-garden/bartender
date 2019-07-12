@@ -49,7 +49,7 @@ class BartenderApp(StoppableThread):
         self.scheduler = self._setup_scheduler()
         self.event_publishers = EventPublishers()
 
-        load_plugin_log_config()
+        load_plugin_log_config(bartender.config.namespace)
 
         self.plugin_loader = LocalPluginLoader(
             validator=self.plugin_validator, registry=self.plugin_registry

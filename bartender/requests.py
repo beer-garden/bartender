@@ -507,22 +507,28 @@ class RequestValidator(object):
             )
 
 
-def get_request(request_id):
-    request = Request.objects.get(id=request_id)
-    request.children = Request.objects(parent=request)
+def get_request(namespace, request_id):
+    request = Request.objects.get(namespace=namespace, id=request_id)
+    request.children = Request.objects(namespace=namespace, parent=request)
 
     return request
 
 
 def get_requests(
-    start=0, length=100, columns=None, order=None, search=None, include_children=False
+    namespace,
+    start=0,
+    length=100,
+    columns=None,
+    order=None,
+    search=None,
+    include_children=False,
 ):
     """Search for requests
 
     :return query_set: The QuerySet representing this query
     :return requested_fields: The fields to be returned for each Request
     """
-    search_params = []
+    search_params = [Q(namespace=namespace)]
     requested_fields = []
     order_by = None
     overall_search = None
@@ -638,7 +644,7 @@ def get_requests(
 
 
 @publish_event(Events.REQUEST_CREATED)
-def process_request(request, wait_timeout=-1):
+def process_request(namespace, request, wait_timeout=-1):
     """Validates and publishes a Request.
 
     Args:
@@ -657,7 +663,9 @@ def process_request(request, wait_timeout=-1):
     request = bartender.application.request_validator.validate_request(request)
 
     # Once validated we need to save since validate can modify the request
+    request.namespace = namespace
     request.save()
+
     request_id = str(request.id)
 
     if wait_timeout != 0:
@@ -697,7 +705,7 @@ def process_request(request, wait_timeout=-1):
     return request
 
 
-def update_request(request, patch):
+def update_request(namespace, request, patch):
     status = None
     output = None
     error_class = None

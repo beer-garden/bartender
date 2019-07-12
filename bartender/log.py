@@ -4,11 +4,11 @@ from bg_utils.plugin_logging_loader import PluginLoggingLoader
 plugin_logging_config = None
 
 
-def get_plugin_log_config(system_name=None):
+def get_plugin_log_config(namespace, system_name=None):
     return plugin_logging_config.get_plugin_log_config(system_name=system_name)
 
 
-def load_plugin_log_config():
+def load_plugin_log_config(namespace):
     global plugin_logging_config
 
     plugin_logging_config = PluginLoggingLoader().load(

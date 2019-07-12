@@ -18,11 +18,12 @@ parser = MongoParser()
 logger = logging.getLogger(__name__)
 
 
-def get_system(system_id):
-    return System.objects.get(id=system_id)
+def get_system(namespace, system_id):
+    return System.objects.get(namespace=namespace, id=system_id)
 
 
 def query_systems(
+    namespace,
     filter_params=None,
     order_by="name",
     include_fields=None,
@@ -40,11 +41,13 @@ def query_systems(
     if not dereference_nested:
         query_set = query_set.no_dereference()
 
+    filter_params["namespace"] = namespace
+
     return query_set.filter(**filter_params)
 
 
 @publish_event(Events.SYSTEM_CREATED)
-def create_system(system):
+def create_system(namespace, system):
     """Create a new system"""
 
     # Assign a default 'main' instance if there aren't any instances and there can
@@ -62,14 +65,15 @@ def create_system(system):
         if not system.max_instances:
             system.max_instances = len(system.instances)
 
+    system.namespace = namespace
     system.deep_save()
 
     return system
 
 
 @publish_event(Events.SYSTEM_UPDATED)
-def update_system(system_id, operations):
-    system = System.objects.get(id=system_id)
+def update_system(namespace, system_id, operations):
+    system = System.objects.get(namespace=namespace, id=system_id)
 
     for op in operations:
         if op.operation == "replace":
@@ -119,7 +123,7 @@ def update_system(system_id, operations):
             else:
                 raise ModelValidationError(f"Unsupported path for update '{op.path}'")
         elif op.operation == "reload":
-            return reload_system(system_id)
+            return reload_system(namespace, system_id)
         else:
             raise ModelValidationError(f"Unsupported operation '{op.operation}'")
 
@@ -128,26 +132,26 @@ def update_system(system_id, operations):
     return system
 
 
-def reload_system(system_id):
+def reload_system(namespace, system_id):
     """Reload a system configuration
 
     :param system_id: The system id
     :return None
     """
-    system = System.objects.get(id=system_id)
+    system = System.objects.get(namespace=namespace, id=system_id)
 
     logger.info("Reloading system: %s-%s", system.name, system.version)
     bartender.application.plugin_manager.reload_system(system.name, system.version)
 
 
 @publish_event(Events.SYSTEM_REMOVED)
-def remove_system(system_id):
+def remove_system(namespace, system_id):
     """Removes a system from the registry if necessary.
 
     :param system_id: The system id
     :return:
     """
-    system = System.objects.get(id=system_id)
+    system = System.objects.get(namespace=namespace, id=system_id)
 
     # Attempt to stop the plugins
     registered = bartender.application.plugin_registry.get_plugins_by_system(
@@ -195,6 +199,6 @@ def remove_system(system_id):
     system.deep_delete()
 
 
-def rescan_system_directory():
+def rescan_system_directory(namespace):
     """Scans plugin directory and starts any new Systems"""
     bartender.application.plugin_manager.scan_plugin_path()

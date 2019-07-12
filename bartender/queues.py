@@ -12,7 +12,7 @@ from brewtils.models import Queue, Events
 logger = logging.getLogger(__name__)
 
 
-def get_queue_message_count(queue_name):
+def get_queue_message_count(namespace, queue_name):
     """Gets the size of a queue
 
     :param queue_name: The queue name
@@ -24,14 +24,14 @@ def get_queue_message_count(queue_name):
     return bartender.application.clients["pyrabbit"].get_queue_size(queue_name)
 
 
-def get_all_queue_info():
+def get_all_queue_info(namespace):
     """Get queue information for all queues
 
     :return size of the queue
     :raises Exception: If queue does not exist
     """
     queues = []
-    systems = System.objects.all().select_related(max_depth=1)
+    systems = System.objects(namespace=namespace).select_related(max_depth=1)
 
     for system in systems:
         for instance in system.instances:
@@ -45,10 +45,11 @@ def get_all_queue_info():
                 system_id=str(system.id),
                 display=system.display_name,
                 size=-1,
+                namespace=namespace,
             )
 
             try:
-                queue.size = get_queue_message_count(queue_name)
+                queue.size = get_queue_message_count(namespace, queue_name)
             except Exception:
                 logger.error(f"Error getting queue size for {queue_name}")
 
@@ -58,7 +59,7 @@ def get_all_queue_info():
 
 
 @publish_event(Events.QUEUE_CLEARED)
-def clear_queue(queue_name):
+def clear_queue(namespace, queue_name):
     """Clear all Requests in the given queue
 
     Will iterate through all requests on a queue and mark them as "CANCELED".
@@ -77,13 +78,13 @@ def clear_queue(queue_name):
 
 
 @publish_event(Events.ALL_QUEUES_CLEARED)
-def clear_all_queues():
+def clear_all_queues(namespace):
     """Clears all queues that Bartender knows about.
 
     :return: None
     """
     logger.debug("Clearing all queues")
-    systems = System.objects.all()
+    systems = System.objects.all(namespace=namespace)
 
     for system in systems:
         for instance in system.instances:
