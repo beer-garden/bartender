@@ -668,7 +668,8 @@ def process_request(request, wait_timeout=-1):
 
     try:
         logger.info(f"Publishing request {request_id}")
-        bartender.application.clients["pika"].publish_request(
+        # bartender.application.clients["pika"].publish_request(
+        bartender.application.clients["file"].publish_request(
             request, confirm=True, mandatory=True
         )
     except Exception as ex:

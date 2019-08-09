@@ -62,10 +62,13 @@ def initialize_instance(instance_id):
 
     instance.status = "INITIALIZING"
     instance.status_info = StatusInfo(heartbeat=datetime.utcnow())
-    instance.queue_type = "rabbitmq"
+    # instance.queue_type = "rabbitmq"
+    instance.queue_type = "file"
     instance.queue_info = {
-        "admin": admin_queue,
-        "request": req_queue,
+        # "admin": admin_queue,
+        # "request": req_queue,
+        "admin": {"directory": "/home/mppatrick/scratch/admin"},
+        "request": {"directory": "/home/mppatrick/scratch/requests"},
         "connection": connection,
     }
     instance.save()

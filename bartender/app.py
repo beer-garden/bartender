@@ -31,6 +31,7 @@ from bartender.thrift.server import make_server
 from bg_utils.event_publisher import EventPublishers
 from bg_utils.mongo.models import Event, Request
 from bg_utils.publishers import MongoPublisher
+from brewtils.file_consumer import FilePublisher
 from brewtils.models import Events
 from brewtils.pika import TransientPikaClient
 from brewtils.stoppable_thread import StoppableThread
@@ -71,6 +72,7 @@ class BartenderApp(StoppableThread):
                 virtual_host=bartender.config.amq.virtual_host,
                 **bartender.config.amq.connections.admin
             ),
+            "file": FilePublisher("/home/mppatrick/scratch/requests/"),
         }
 
         self.plugin_manager = LocalPluginsManager(
