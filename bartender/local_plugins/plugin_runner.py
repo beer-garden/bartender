@@ -198,10 +198,10 @@ class LocalPluginRunner(StoppableThread):
         the plugin has its own logger and formatter. In that case we log to our
         unformatted logger at the same level to keep the original formatting.
 
-        If we can't determine the log level then we'll add a timestamp to the
-        start and log the message at ``default_level``. That way we guarantee
-        messages are outputted (this is usually caused by a plugin writing to
-        STDOUT / STDERR directly or raising an exception with a stacktrace).
+        If we can't determine the log level then we'll log the message at
+        ``default_level``. That way we guarantee messages are outputted (this
+        is usually caused by a plugin writing to STDOUT / STDERR directly or
+        raising an exception with a stacktrace).
         """
         stream_reader = iter(stream.readline, "")
 
