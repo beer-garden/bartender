@@ -192,7 +192,7 @@ class RequestValidator(object):
 
             if choices.type == "static":
                 if isinstance(choices.value, list):
-                    allowed_values = choices.value
+                    raw_allowed = choices.value
                 elif isinstance(choices.value, dict):
                     key = choices.details.get("key_reference")
                     if key is None:
@@ -208,8 +208,8 @@ class RequestValidator(object):
                         # Mongoengine stores None keys as 'null', so use that instead of None
                         key_reference_value = request.parameters.get(key) or "null"
 
-                    allowed_values = choices.value.get(key_reference_value)
-                    if allowed_values is None:
+                    raw_allowed = choices.value.get(key_reference_value)
+                    if raw_allowed is None:
                         raise ModelValidationError(
                             "Unable to validate choices for parameter '%s' - Choices"
                             " dictionary doesn't contain an entry with key '%s'"
@@ -224,16 +224,9 @@ class RequestValidator(object):
                 parsed_value = parse(choices.value, parse_as="url")
                 query_params = map_param_values(parsed_value["args"])
 
-                response_json = json.loads(
+                raw_allowed = json.loads(
                     self._session.get(parsed_value["address"], params=query_params).text
                 )
-
-                allowed_values = []
-                for item in response_json:
-                    if isinstance(item, dict):
-                        allowed_values.append(item["value"])
-                    else:
-                        allowed_values.append(item)
             elif choices.type == "command":
 
                 if isinstance(choices.value, six.string_types):
@@ -260,18 +253,13 @@ class RequestValidator(object):
                         " must be a string or dictionary " % command_parameter.key
                     )
 
-                parsed_output = json.loads(response.output)
-                if isinstance(parsed_output, list):
-                    if len(parsed_output) < 1:
+                raw_allowed = json.loads(response.output)
+                if isinstance(raw_allowed, list):
+                    if len(raw_allowed) < 1:
                         raise ModelValidationError(
                             "Unable to validate choices for parameter '%s' - Result "
                             "of choices query was empty list" % command_parameter.key
                         )
-
-                    if isinstance(parsed_output[0], dict):
-                        allowed_values = [item["value"] for item in parsed_output]
-                    else:
-                        allowed_values = parsed_output
                 else:
                     raise ModelValidationError(
                         "Unable to validate choices for parameter '%s' - Result of "
@@ -283,6 +271,15 @@ class RequestValidator(object):
                     "specified (valid types are %s)"
                     % (command_parameter.key, Choices.TYPES)
                 )
+
+            # At this point raw_allowed is a list, but that list can potentially contain
+            # {"value": "", "text": ""} dicts. Need to collapse those to strings
+            allowed_values = []
+            for allowed in raw_allowed:
+                if isinstance(allowed, dict):
+                    allowed_values.append(allowed["value"])
+                else:
+                    allowed_values.append(allowed)
 
             if command_parameter.multi:
                 for single_value in value:
