@@ -94,7 +94,7 @@ class BartenderHandler(object):
             )
         )
         admin_keys = get_routing_keys(*routing_words, is_admin=True)
-        admin_args = {"auto_delete": True}
+        admin_args = {}
         admin_queue = self.clients["pika"].setup_queue(
             admin_keys[-1], admin_args, admin_keys
         )
