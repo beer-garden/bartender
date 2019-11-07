@@ -2,10 +2,11 @@ import logging
 import random
 import string
 from datetime import datetime
-from time import sleep
 
 import mongoengine
+import pika.spec
 from pyrabbit2.http import HTTPError
+from time import sleep
 
 import bartender
 import bartender._version
@@ -52,7 +53,10 @@ class BartenderHandler(object):
 
             try:
                 self.clients["pika"].publish_request(
-                    request, confirm=True, mandatory=True
+                    request,
+                    confirm=True,
+                    mandatory=True,
+                    delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE,
                 )
             except Exception:
                 msg = "Error while publishing request to queue (%s[%s]-%s %s)" % (

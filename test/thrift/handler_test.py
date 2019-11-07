@@ -1,6 +1,7 @@
 import unittest
 
 import mongoengine
+import pika.spec
 from mock import MagicMock, Mock, PropertyMock, patch, call
 from pika.exceptions import UnroutableError
 from pyrabbit2.http import HTTPError
@@ -53,7 +54,10 @@ class BartenderHandlerTest(unittest.TestCase):
         self.handler.processRequest("id")
         find_mock.assert_called_once_with("id")
         self.clients["pika"].publish_request.assert_called_once_with(
-            request, confirm=True, mandatory=True
+            request,
+            confirm=True,
+            mandatory=True,
+            delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE,
         )
 
     @patch("bg_utils.mongo.models.Request.find_or_none")
