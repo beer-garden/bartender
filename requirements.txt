@@ -72,7 +72,7 @@ simplejson==3.16.0
 six==1.12.0               # via bleach, mock, mongoengine, more-itertools, packaging, pathlib2, pytest, readme-renderer, sphinx, tox, yapconf
 snowballstemmer==1.2.1    # via sphinx
 sphinx-rtd-theme==0.4.3
-sphinx==1.8.5
+sphinx==3.2.1
 sphinxcontrib-websupport==1.1.0  # via sphinx
 subprocess32==3.5.3 ; python_version < "3.0"
 thriftpy2==0.4.2
