@@ -52,7 +52,7 @@ def is_string_environment_variable(string):
 
 
 def get_environment_var_name_from_string(string):
-    """Strips out the Variable name from a string
+    """ Strips out the Variable name from a string
     :param string: e.g. $MY_PATH:$YOUR_PATH
     :return string: e.g. MY_PATH
     """
