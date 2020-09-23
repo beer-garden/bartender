@@ -29,4 +29,6 @@ class MongoPrunerTest(unittest.TestCase):
         self.mongo_pruner._stop_event = Mock(wait=Mock(side_effect=[False, True]))
 
         self.mongo_pruner.run()
-        self.assertTrue(self.collection_mock.objects.return_value.delete.called)
+        self.assertTrue(self.collection_mock.objects.return_value.no_cache.called)
+        self.assertTrue(self.collection_mock.objects.return_value.
+                        no_cache.return_value.delete.called)
