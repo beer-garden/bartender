@@ -412,6 +412,13 @@ SPECIFICATION = {
                         "previous_names": ["plugins_directory", "plugin_directory"],
                         "alt_env_names": ["PLUGINS_DIRECTORY", "BG_PLUGIN_DIRECTORY"],
                     },
+                    "host_env_vars": {
+                        "type": "list",
+                        "items": {"env_var": {"type": "str"}},
+                        "default": [],
+                        "description": "Host environment variables that will be "
+                        "propagated to local plugin processes",
+                    },
                     "log_directory": {
                         "type": "str",
                         "description": "Directory where local plugin logs should go",
