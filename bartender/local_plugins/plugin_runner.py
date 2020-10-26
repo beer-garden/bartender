@@ -40,7 +40,7 @@ class LocalPluginRunner(StoppableThread):
         url_prefix=None,
         ca_verify=True,
         ca_cert=None,
-        **kwargs
+        **kwargs,
     ):
         self.entry_point = entry_point
         self.system = system
@@ -90,7 +90,7 @@ class LocalPluginRunner(StoppableThread):
         self.logger = getPluginLogger(
             self.unique_name,
             format_string="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            **log_config
+            **log_config,
         )
 
         log_config["log_level"] = self.plugin_default_log_level
