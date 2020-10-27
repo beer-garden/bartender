@@ -5,6 +5,7 @@ from threading import Thread
 from time import sleep
 import signal
 
+import bartender
 from bartender.local_plugins.env_help import expand_string_with_environment_var
 from mongoengine import DoesNotExist, OperationError
 
@@ -240,6 +241,18 @@ class LocalPluginRunner(StoppableThread):
 
         for key, value in plugin_env.items():
             plugin_env[key] = str(value)
+
+        # Allowed host env vars
+        for env_var in bartender.config.plugin.local.host_env_vars:
+            if env_var in plugin_env:
+                self.logger.warning(
+                    "%s is present in the list of host environment variables to "
+                    "propagate to local plugins, but that environment variable name is "
+                    "reserved by Beergarden for internal use. The host value will NOT "
+                    "be used." % env_var
+                )
+            else:
+                plugin_env[env_var] = os.environ.get(env_var, "")
 
         for key, value in self.environment.items():
             plugin_env[key] = expand_string_with_environment_var(str(value), plugin_env)

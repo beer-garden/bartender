@@ -1,11 +1,15 @@
+import os
+
 import logging
 import subprocess
 import sys
 
 import pytest
+from box import Box
 from mock import Mock, PropertyMock, call, ANY
 from mongoengine import DoesNotExist
 
+import bartender
 from bartender.local_plugins.plugin_runner import LocalPluginRunner
 
 
@@ -23,6 +27,24 @@ def system_mock(instance_mock):
     return sys_mock
 
 
+@pytest.fixture(autouse=True)
+def config_mock():
+    config_mock = Box(default_box=True)
+    bartender.config = config_mock
+    return config_mock
+
+
+@pytest.fixture(autouse=True)
+def mangle_env():
+    env_orig = os.environ.copy()
+
+    try:
+        yield
+    finally:
+        os.environ.clear()
+        os.environ.update(env_orig)
+
+
 @pytest.fixture
 def plugin(system_mock):
     return LocalPluginRunner(
@@ -37,6 +59,7 @@ def plugin(system_mock):
 
 
 class TestPluginRunner(object):
+
     @pytest.mark.parametrize(
         "entry_point,expected",
         [
@@ -124,6 +147,29 @@ class TestPluginRunner(object):
         plugin.environment = {"FOO": "BAR"}
         plugin_env = plugin._generate_plugin_environment()
         assert plugin_env.get("FOO") == "BAR"
+
+    def test_generate_plugin_environment_host_var(self, plugin, config_mock):
+        os.environ.update({"FOO": "BAR"})
+        config_mock.plugin.local.host_env_vars = ["FOO"]
+
+        assert plugin._generate_plugin_environment().get("FOO") == "BAR"
+
+    def test_generate_plugin_environment_host_var_missing(self, plugin, config_mock):
+        config_mock.plugin.local.host_env_vars = ["FOO"]
+
+        assert plugin._generate_plugin_environment().get("FOO") == ""
+
+    def test_generate_plugin_environment_host_var_reserved(self, plugin, config_mock):
+        os.environ.update({"BG_NAME": "BAR"})
+        config_mock.plugin.local.host_env_vars = ["BG_NAME"]
+
+        assert plugin._generate_plugin_environment().get("BG_NAME") != "BAR"
+
+    def test_generate_plugin_environment_host_var_unallowed(self, plugin, config_mock):
+        os.environ.update({"FOO": "BAR"})
+        config_mock.plugin.local.host_env_vars = []
+
+        assert "FOO" not in plugin._generate_plugin_environment()
 
     def test_process_creation(self, mocker, plugin):
         mocker.patch("bartender.local_plugins.plugin_runner.Thread")
