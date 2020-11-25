@@ -4,8 +4,6 @@
 #
 #    pip-compile --output-file requirements.txt requirements.in
 #
--e git+https://github.com/beer-garden/bg-utils@develop#egg=bg-utils
--e git+https://github.com/beer-garden/brewtils@develop#egg=brewtils
 alabaster==0.7.12         # via sphinx
 appdirs==1.4.3            # via black
 argh==0.26.2              # via watchdog
@@ -14,6 +12,8 @@ attrs==19.1.0             # via black, pytest
 babel==2.6.0              # via sphinx
 black==19.3b0 ; python_version > "3.5"
 bleach==3.1.0             # via readme-renderer
+bg-utils==2.4.10
+brewtils==2.4.15          # via bg-utils
 certifi==2019.3.9         # via requests
 chardet==3.0.4            # via requests
 click==7.0                # via black
