@@ -10,42 +10,35 @@ argh==0.26.2              # via watchdog
 atomicwrites==1.3.0       # via pytest
 attrs==19.1.0             # via black, pytest
 babel==2.6.0              # via sphinx
-black==19.3b0 ; python_version > "3.5"
-bleach==3.1.0             # via readme-renderer
-bg-utils==2.4.10
+bg-utils==2.4.10          # via -r requirements.in
+black==19.3b0 ; python_version > "3.5"  # via -r requirements.in
+bleach==3.1.4             # via readme-renderer
 brewtils==2.4.15          # via bg-utils
 certifi==2019.3.9         # via requests
 chardet==3.0.4            # via requests
 click==7.0                # via black
-codecov==2.0.15
-configparser==3.7.4       # via entrypoints, flake8
-coverage==4.5.3
+codecov==2.0.15           # via -r requirements.in
+coverage==4.5.3           # via -r requirements.in, codecov
 docutils==0.14            # via readme-renderer, sphinx
 entrypoints==0.3          # via flake8
-enum34==1.1.6             # via flake8
 filelock==3.0.10          # via tox
-flake8==3.7.7
-funcsigs==1.0.2           # via mock, pytest
-functools32==3.2.3.post2 ; python_version < "3.0"  # via flake8
-future==0.17.1 ; python_version < "3.0"
-futures==3.2.0 ; python_version < "3.0"
+flake8==3.7.7             # via -r requirements.in
 idna==2.8                 # via requests
 imagesize==1.1.0          # via sphinx
 jinja2==2.10.1            # via sphinx
-lark-parser==0.6.7
+lark-parser==0.6.7        # via brewtils
 markupsafe==1.1.1         # via jinja2
-marshmallow-polyfield==3.2
-marshmallow==2.19.2       # via marshmallow-polyfield
+marshmallow-polyfield==3.2  # via brewtils
+marshmallow==2.19.2       # via brewtils, marshmallow-polyfield
 mccabe==0.6.1             # via flake8
-mock==2.0.0
-mongoengine==0.15.3
+mock==2.0.0               # via -r requirements.in
+mongoengine==0.15.3       # via bg-utils
 more-itertools==5.0.0     # via pytest
-packaging==19.0           # via sphinx
-passlib==1.7.1
-pathlib2==2.3.3           # via pytest
+packaging==19.0           # via brewtils, sphinx
+passlib==1.7.1            # via bg-utils
 pathtools==0.1.2          # via watchdog
 pbr==5.1.3                # via mock
-pika==1.0.1
+pika==1.0.1               # via brewtils
 pkginfo==1.5.0.1          # via twine
 pluggy==0.9.0             # via pytest, tox
 ply==3.11                 # via thriftpy2
@@ -53,38 +46,34 @@ py==1.8.0                 # via pytest, tox
 pycodestyle==2.5.0        # via flake8
 pyflakes==2.1.1           # via flake8
 pygments==2.3.1           # via readme-renderer, sphinx
-pyjwt==1.7.1
+pyjwt==1.7.1              # via brewtils
 pymongo==3.8.0            # via mongoengine
 pyparsing==2.4.0          # via packaging
-pyrabbit2==1.0.7
-pytest-mock==1.10.4
-pytest==3.10.1
+pyrabbit2==1.0.7          # via -r requirements.in
+pytest-mock==1.10.4       # via -r requirements.in
+pytest==3.10.1            # via -r requirements.in, pytest-mock
 python-box==3.3.0         # via yapconf
-pytz==2018.9
+pytz==2018.9              # via -r requirements.in, babel, bg-utils
 pyyaml==5.1               # via watchdog
 readme-renderer==24.0     # via twine
 requests-toolbelt==0.9.1  # via twine
-requests==2.21.0          # via codecov, pyrabbit2, requests-toolbelt, sphinx, twine
-ruamel.ordereddict==0.4.13 ; python_version < "3.0"
-ruamel.yaml==0.15.94
-scandir==1.10.0           # via pathlib2
-simplejson==3.16.0
-six==1.12.0               # via bleach, mock, mongoengine, more-itertools, packaging, pathlib2, pytest, readme-renderer, sphinx, tox, yapconf
+requests==2.21.0          # via brewtils, codecov, pyrabbit2, requests-toolbelt, sphinx, twine
+ruamel.yaml==0.15.94      # via bg-utils
+simplejson==3.16.0        # via brewtils
+six==1.12.0               # via bleach, brewtils, mock, mongoengine, more-itertools, packaging, pytest, readme-renderer, sphinx, tox, yapconf
 snowballstemmer==1.2.1    # via sphinx
-sphinx-rtd-theme==0.4.3
-sphinx==1.8.5
+sphinx-rtd-theme==0.4.3   # via -r requirements.in
+sphinx==1.8.5             # via -r requirements.in, sphinx-rtd-theme
 sphinxcontrib-websupport==1.1.0  # via sphinx
-subprocess32==3.5.3 ; python_version < "3.0"
-thriftpy2==0.4.2
+thriftpy2==0.4.2          # via bg-utils
 toml==0.10.0              # via black, tox
-tox==3.9.0
+tox==3.9.0                # via -r requirements.in
 tqdm==4.31.1              # via twine
-twine==1.13.0
-typing==3.6.6             # via flake8, sphinx
+twine==1.13.0             # via -r requirements.in
 urllib3==1.24.2           # via requests
 virtualenv==16.5.0        # via tox
-watchdog==0.9.0
+watchdog==0.9.0           # via -r requirements.in, yapconf
 webencodings==0.5.1       # via bleach
-wheel==0.33.1
-wrapt==1.11.1
-yapconf==0.3.3
+wheel==0.33.1             # via -r requirements.in
+wrapt==1.11.1             # via brewtils
+yapconf==0.3.3            # via bg-utils, brewtils
