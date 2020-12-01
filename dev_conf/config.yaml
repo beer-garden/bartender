@@ -46,7 +46,7 @@ plugin:
       password: password
       username: admin
     directory: ./plugins
-    host_env_vars: []
+    host_env_vars: null
     log_directory: null
     timeout:
       shutdown: 10

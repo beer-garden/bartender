@@ -415,7 +415,7 @@ SPECIFICATION = {
                     "host_env_vars": {
                         "type": "list",
                         "items": {"env_var": {"type": "str"}},
-                        "default": [],
+                        "required": False,
                         "description": "Host environment variables that will be "
                         "propagated to local plugin processes",
                     },

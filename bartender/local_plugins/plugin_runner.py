@@ -243,7 +243,8 @@ class LocalPluginRunner(StoppableThread):
             plugin_env[key] = str(value)
 
         # Allowed host env vars
-        for env_var in bartender.config.plugin.local.host_env_vars:
+        host_vars = bartender.config.plugin.local.host_env_vars or []
+        for env_var in host_vars:
             if env_var in plugin_env:
                 self.logger.warning(
                     "%s is present in the list of host environment variables to "
