@@ -1,0 +1,62 @@
+name: Tag-Actions
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  PyPI:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ['3.7']
+
+    name: Python ${{ matrix.python-version }} PyPi
+
+    steps:
+
+      - uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # Need to update if we support other OS's
+      - name: Cache PIP Install
+        uses: actions/cache@v2
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-${{ matrix.python-version }}-pip-build-${{ hashFiles('**/setup.py') }}-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.python-version }}-pip-build
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools wheel twine
+
+      - name: Build and publish
+        env:
+          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        run: make publish-package
+
+  Docker:
+    needs: PyPi
+    runs-on: ubuntu-latest
+    name: Docker Builder
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build Images
+        run: make publish-docker VERSION=${GITHUB_REF/refs\/tags\//}
+
