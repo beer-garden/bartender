@@ -58,5 +58,5 @@ jobs:
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Build Images
-        run: make publish-docker VERSION=${GITHUB_REF/refs\/tags\//}
+        run: make publish-docker VERSION=${GITHUB_REF#refs/tags/}
 
