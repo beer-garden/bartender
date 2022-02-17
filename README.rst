@@ -37,7 +37,7 @@ Getting Started
 Pre-requisites
 --------------
 
-* Python >= 2.7, 3.4
+* Python >= 2.7, < 3.9
 * pip
 * Connectivity to MongoDB Server  - (Tested on 3.4)
 * Connectivity to Rabbitmq-Server - (Tested on 3.6)

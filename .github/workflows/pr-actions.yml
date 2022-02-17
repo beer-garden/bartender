@@ -8,8 +8,8 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ['3.7']
-        os: ['ubuntu-latest']
+        python-version: ["3.8"]
+        os: ["ubuntu-latest"]
 
     name: Linting OS ${{ matrix.os }} - Python ${{ matrix.python-version }}
     steps:
@@ -37,8 +37,8 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ['3.7', '3.8']
-        os: ['ubuntu-latest']
+        python-version: ["3.8"]
+        os: ["ubuntu-latest"]
 
     name: PyTests OS ${{ matrix.os }} - Python ${{ matrix.python-version }}
     steps:
@@ -64,13 +64,12 @@ jobs:
         run: make test
 
   CodeCoverage:
-
     runs-on: ${{ matrix.os }}
 
     strategy:
       matrix:
-        python-version: ['3.7']
-        os: ['ubuntu-latest']
+        python-version: ["3.8"]
+        os: ["ubuntu-latest"]
 
     env:
       OS: ${{ matrix.os }}
