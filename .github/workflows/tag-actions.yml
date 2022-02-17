@@ -3,7 +3,7 @@ name: Tag-Actions
 on:
   push:
     tags:
-      - '*'
+      - "*"
 
 jobs:
   PyPI:
@@ -11,12 +11,11 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ['3.7']
+        python-version: ["3.8"]
 
     name: Python ${{ matrix.python-version }} PyPi
 
     steps:
-
       - uses: actions/checkout@v2
 
       - name: Set up Python
@@ -59,4 +58,3 @@ jobs:
 
       - name: Build Images
         run: make publish-docker VERSION=${GITHUB_REF#refs/tags/}
-
